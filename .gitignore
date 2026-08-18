@@ -1,0 +1,5 @@
+dist-newstyle/
+cabal.project.freeze
+*.o
+*.hi
+.DS_Store

@@ -1,0 +1,71 @@
+cabal-version:      3.0
+name:               symmetry
+version:            0.1.0.0
+synopsis:           Statically typed symmetry-respecting linear maps
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Reuben Cohn-Gordon
+maintainer:         reubenharry@gmail.com
+category:           Math
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+                    README.md
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:
+        Symmetry.Utils
+        Symmetry.Orphans
+        Symmetry.ChargeEq
+        Symmetry.Group
+        Symmetry.SU2
+        Symmetry.IrrepDecide
+        Symmetry.RepSingleton
+        Symmetry.HomBlock
+        Symmetry.Tensor
+        Symmetry.CG.SU2
+        Symmetry.CG.U1
+        Symmetry.CG.FSymbol
+        Symmetry.CG.RSymbol
+        Symmetry.RepObj
+        Symmetry.RepSectors
+        Symmetry.RepMor
+        Symmetry.Intertwiner.Pretty
+        Symmetry.FunctorExperiment
+        Symmetry.FunctorU1
+        Symmetry.FunctorSU2
+        Symmetry.FunctorU1Simple
+        Symmetry.DirectSum
+        Random.Maps
+    other-modules:
+        Symmetry.Categorical
+    build-depends:
+        base ^>=4.19.2.0,
+        linearmap-category >= 0.6 && < 0.7,
+        linearmap-hmatrix >= 0.1 && < 0.2,
+        free-vector-spaces,
+        lens,
+        adjunctions,
+        singletons,
+        singletons-th ^>=3.3,
+        transformers,
+        random,
+        linear,
+        ieee754,
+        vector-space,
+        containers,
+        constrained-categories,
+        manifolds-core,
+        QuickCheck,
+        hmatrix,
+        vector,
+        vector-sized,
+        indexed-list-literals,
+        finite-typelits,
+        ghc-typelits-knownnat,
+        mtl
+    hs-source-dirs:   src
+    default-language: Haskell2010
