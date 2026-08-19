@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE NoStarIsType #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoStarIsType #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Shared group index for representation spines and intertwiner plumbing.
@@ -14,26 +14,27 @@
 -- @GroupElement SU2@ is the Cayley–Klein type from 'Representations.Group.SU2'; the irrep
 -- action lives there as 'Representations.Group.SU2.applyWigner'.
 module Representations.Group
-  ( Group (..)
-  , GroupElement
-  , SU2Element
-  , Irreps
-  , Rep
-  , IrrepDim
-  , SectorDim
-  , RepDim
-  , IrrepEq
-  , LookupMultGo
-  , LookupMult
-  , HomSectorList
-  , IntertwinerHom
-  ) where
+  ( Group (..),
+    GroupElement,
+    SU2Element,
+    Irreps,
+    Rep,
+    IrrepDim,
+    SectorDim,
+    RepDim,
+    IrrepEq,
+    LookupMult,
+    IntertwinerHom,
+  )
+where
 
 import Data.Kind (Type)
-import GHC.TypeLits (Nat, type (+), type (*))
+import Data.List.Singletons (type (++))
+import Data.Type.Bool (If)
+import GHC.TypeLits (Nat, type (*), type (+))
 import Representations.Group.ChargeEq (NatEq, ZEq)
 import Representations.Group.SU2 (SU2Element)
-import Representations.Utils (Z, Append)
+import Representations.Utils (Z)
 
 data Group = U1 | SU2
 
@@ -68,35 +69,29 @@ type family IrrepEq (g :: Group) (a :: Irreps g) (b :: Irreps g) :: Bool where
   IrrepEq U1 a b = ZEq a b
   IrrepEq SU2 a b = NatEq a b
 
-type family LookupMultGo (eq :: Bool) (m :: Nat) (rest :: Maybe Nat) :: Maybe Nat where
-  LookupMultGo 'True m _ = 'Just m
-  LookupMultGo 'False _ rest = rest
-
 --------------------------------------------------------------------------------
 -- Spine operations (case on @g@ first so @Rep g@ reduces)
 --------------------------------------------------------------------------------
 
 type family LookupMult (g :: Group) (j :: Irreps g) (q :: Rep g) :: Maybe Nat where
-  LookupMult U1 _ '[]                = 'Nothing
+  LookupMult U1 _ '[] = 'Nothing
   LookupMult U1 z ('(z2, m) ': rest) =
-    LookupMultGo (ZEq z z2) m (LookupMult U1 z rest)
-  LookupMult SU2 _ '[]                = 'Nothing
+    If (ZEq z z2) ('Just m) (LookupMult U1 z rest)
+  LookupMult SU2 _ '[] = 'Nothing
   LookupMult SU2 j ('(j2, m) ': rest) =
-    LookupMultGo (NatEq j j2) m (LookupMult SU2 j rest)
+    If (NatEq j j2) ('Just m) (LookupMult SU2 j rest)
 
 type family MkBlock (j :: k) (mm :: Maybe Nat) (n :: Nat) :: [(k, Nat, Nat)] where
-  MkBlock _ 'Nothing  _ = '[]
-  MkBlock j ('Just m) n = '[ '( j, m, n)]
+  MkBlock _ 'Nothing _ = '[]
+  MkBlock j ('Just m) n = '[ '(j, m, n)]
 
-type family HomSectorList (g :: Group) (r :: Rep g) (q :: Rep g)
-  :: [(Irreps g, Nat, Nat)] where
-  HomSectorList U1 '[] _              = '[]
-  HomSectorList U1 ('(z, n) ': rs) q  =
-    Append (MkBlock z (LookupMult U1 z q) n) (HomSectorList U1 rs q)
-  HomSectorList SU2 '[] _              = '[]
-  HomSectorList SU2 ('(j, n) ': rs) q  =
-    Append (MkBlock j (LookupMult SU2 j q) n) (HomSectorList SU2 rs q)
-
--- | Hom-sector spine for an intertwiner.
-type IntertwinerHom (g :: Group) (r :: Rep g) (q :: Rep g) =
-  HomSectorList g r q
+type family
+  IntertwinerHom (g :: Group) (r :: Rep g) (q :: Rep g) ::
+    [(Irreps g, Nat, Nat)]
+  where
+  IntertwinerHom U1 '[] _ = '[]
+  IntertwinerHom U1 ('(z, n) ': rs) q =
+    MkBlock z (LookupMult U1 z q) n ++ IntertwinerHom U1 rs q
+  IntertwinerHom SU2 '[] _ = '[]
+  IntertwinerHom SU2 ('(j, n) ': rs) q =
+    MkBlock j (LookupMult SU2 j q) n ++ IntertwinerHom SU2 rs q

@@ -1,37 +1,39 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE NoStarIsType #-}
-{-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 -- | Sampling of Schur-block intertwiners.
 module Representations.Intertwiner.Random
-  ( genGaussian
-  , genComplexGaussian
-  , genMat
-  , genCoeffBlock
-  , GenHomSectors (..)
-  , genIntertwiner
-  ) where
+  ( genGaussian,
+    genComplexGaussian,
+    genMat,
+    GenHomSectors (..),
+    genIntertwiner,
+  )
+where
 
 import Control.Monad (replicateM)
 import Data.Complex (Complex (..))
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
 import Numeric.LinearAlgebra.Static (M, Sized (fromList))
-import qualified Test.QuickCheck as QC
+import Representations.Group (Group (..), IntertwinerHom, Irreps)
 import Representations.Intertwiner
-  ( Intertwiner (..), IntertwinerSectors (..) )
-import Representations.Group (Group (..), Irreps, IntertwinerHom)
-import Representations.Rep.HomBlock (HomBlockDim, CoeffBlock (..))
+  ( Intertwiner (..),
+    IntertwinerSectors (..),
+  )
+import Representations.Rep.HomBlock (HomBlockDim)
+import qualified Test.QuickCheck as QC
 
 --------------------------------------------------------------------------------
 -- Scalars
@@ -60,11 +62,6 @@ genMat = do
   xs <- replicateM entries genComplexGaussian
   pure (fromList xs)
 
-genCoeffBlock
-  :: forall m n. (KnownNat m, KnownNat n, KnownNat (HomBlockDim m n))
-  => QC.Gen (CoeffBlock m n)
-genCoeffBlock = CoeffBlock <$> genMat @m @n
-
 -- | Draw one independent coefficient block per hom-sector entry.
 class GenHomSectors (g :: Group) (hom :: [(Irreps g, Nat, Nat)]) where
   genHomSectors :: QC.Gen (IntertwinerSectors g hom)
@@ -73,22 +70,30 @@ instance GenHomSectors U1 '[] where
   genHomSectors = pure InterNil
 
 instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDim m n)
-  , GenHomSectors U1 rest
-  ) => GenHomSectors U1 ('(j, m, n) ': rest) where
-  genHomSectors = InterCons <$> genCoeffBlock @m @n <*> genHomSectors
+  ( KnownNat m,
+    KnownNat n,
+    KnownNat (HomBlockDim m n),
+    GenHomSectors U1 rest
+  ) =>
+  GenHomSectors U1 ('(j, m, n) ': rest)
+  where
+  genHomSectors = InterCons <$> genMat @m @n <*> genHomSectors
 
 instance GenHomSectors SU2 '[] where
   genHomSectors = pure InterNil
 
 instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDim m n)
-  , GenHomSectors SU2 rest
-  ) => GenHomSectors SU2 ('(j, m, n) ': rest) where
-  genHomSectors = InterCons <$> genCoeffBlock @m @n <*> genHomSectors
+  ( KnownNat m,
+    KnownNat n,
+    KnownNat (HomBlockDim m n),
+    GenHomSectors SU2 rest
+  ) =>
+  GenHomSectors SU2 ('(j, m, n) ': rest)
+  where
+  genHomSectors = InterCons <$> genMat @m @n <*> genHomSectors
 
-genIntertwiner
-  :: forall g r q
-   . GenHomSectors g (IntertwinerHom g r q)
-  => QC.Gen (Intertwiner g r q)
+genIntertwiner ::
+  forall g r q.
+  (GenHomSectors g (IntertwinerHom g r q)) =>
+  QC.Gen (Intertwiner g r q)
 genIntertwiner = MkIntertwiner <$> genHomSectors

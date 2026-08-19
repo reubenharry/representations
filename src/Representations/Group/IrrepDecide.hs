@@ -1,24 +1,25 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Singleton-level irrep equality, indexed by 'Group'.
 module Representations.Group.IrrepDecide
-  ( IrrepEqResult (..)
-  , IrrepDecide (..)
-  ) where
+  ( IrrepEqResult (..),
+    IrrepDecide (..),
+  )
+where
 
 import Data.Singletons (Sing)
+import Representations.Group (Group (..), IrrepEq, Irreps)
 import Representations.Group.ChargeEq (NatEqResult (..), ZEqResult (..), sNatEq, sZEq)
-import Representations.Group (Group (..), Irreps, IrrepEq)
 
 data IrrepEqResult (g :: Group) (a :: Irreps g) (b :: Irreps g) where
-  IrrepEqTrue  :: (IrrepEq g a b ~ 'True)  => IrrepEqResult g a b
+  IrrepEqTrue :: (IrrepEq g a b ~ 'True) => IrrepEqResult g a b
   IrrepEqFalse :: (IrrepEq g a b ~ 'False) => IrrepEqResult g a b
 
 class IrrepDecide (g :: Group) where
@@ -27,11 +28,11 @@ class IrrepDecide (g :: Group) where
 instance IrrepDecide U1 where
   sIrrepEq sa sb =
     case sZEq sa sb of
-      ZEqTrue  -> IrrepEqTrue
+      ZEqTrue -> IrrepEqTrue
       ZEqFalse -> IrrepEqFalse
 
 instance IrrepDecide SU2 where
   sIrrepEq sa sb =
     case sNatEq sa sb of
-      NatEqTrue  -> IrrepEqTrue
+      NatEqTrue -> IrrepEqTrue
       NatEqFalse -> IrrepEqFalse

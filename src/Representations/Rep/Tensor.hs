@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoStarIsType #-}
-{-# LANGUAGE PolyKinds #-}
 
 -- | Type-level tensor product of representation spines (@Rep g@).
 --
@@ -15,40 +15,42 @@
 -- Runtime fuse maps ('Representations.CG.SU2.fuseSU2Flat', U(1) forget) must emit this
 -- same coalesced order.
 module Representations.Rep.Tensor
-  ( Tensor
-  , TensorRaw
-  , TensorOne
-  , TensorIrrepRepSU2
-  , Coalesce
-  , InsertSector
-  ) where
+  ( Tensor,
+    TensorRaw,
+    TensorOne,
+    TensorIrrepRepSU2,
+    Coalesce,
+    InsertSector,
+  )
+where
 
-import GHC.TypeLits (Nat, CmpNat, type (+), type (-))
+import Data.List.Singletons (type (++))
+import Data.Type.Ord (OrdCond)
+import GHC.TypeLits (CmpNat, Nat, type (*), type (+), type (-))
 import Representations.Group (Group (..), Irreps, Rep)
-import Representations.Utils (Add, Append, Scale, Z (..))
+import Representations.Utils (Add, Z (..))
 
 -- | Fused spine @r ⊗ q@, coalesced and sorted by irrep.
 type family Tensor (g :: Group) (r :: Rep g) (q :: Rep g) :: Rep g where
   Tensor g r q = Coalesce g (TensorRaw g r q)
 
--- | Uncoalesced CG branching (left sectors × right sectors, Append order).
+-- | Uncoalesced CG branching (left sectors × right sectors, list-append order).
 type family TensorRaw (g :: Group) (r :: Rep g) (q :: Rep g) :: Rep g where
   TensorRaw U1 '[] _ = '[]
   TensorRaw U1 ('(i, m) ': rs) q =
-    Append (TensorOne U1 '(i, m) q) (TensorRaw U1 rs q)
+    TensorOne U1 '(i, m) q ++ TensorRaw U1 rs q
   TensorRaw SU2 '[] _ = '[]
   TensorRaw SU2 ('(i, m) ': rs) q =
-    Append (TensorOne SU2 '(i, m) q) (TensorRaw SU2 rs q)
+    TensorOne SU2 '(i, m) q ++ TensorRaw SU2 rs q
 
 type family TensorOne (g :: Group) (x :: (Irreps g, Nat)) (q :: Rep g) :: Rep g where
   TensorOne U1 _ '[] = '[]
   TensorOne U1 '(i, m) ('(j, n) ': qs) =
-    '(Add i j, Scale m n) ': TensorOne U1 '(i, m) qs
+    '(Add i j, m * n) ': TensorOne U1 '(i, m) qs
   TensorOne SU2 _ '[] = '[]
   TensorOne SU2 '(i, m) ('(j, n) ': qs) =
-    Append
-      (ScaleRep (Scale m n) (TensorIrrepRepSU2 i j))
-      (TensorOne SU2 '(i, m) qs)
+    ScaleRep (m * n) (TensorIrrepRepSU2 i j)
+      ++ TensorOne SU2 '(i, m) qs
 
 --------------------------------------------------------------------------------
 -- Coalesce: merge equal irreps, sort by label
@@ -84,16 +86,30 @@ type family InsertSector (g :: Group) (j :: Irreps g) (m :: Nat) (r :: Rep g) ::
   InsertSector U1 j m r = InsertSectorU1 j m r
   InsertSector SU2 j m r = InsertSectorSU2 j m r
 
-type family InsertSectorNat
-  (o :: Ordering) (j :: Nat) (m :: Nat) (j2 :: Nat) (n :: Nat) (rest :: [(Nat, Nat)])
-  :: [(Nat, Nat)] where
+type family
+  InsertSectorNat
+    (o :: Ordering)
+    (j :: Nat)
+    (m :: Nat)
+    (j2 :: Nat)
+    (n :: Nat)
+    (rest :: [(Nat, Nat)]) ::
+    [(Nat, Nat)]
+  where
   InsertSectorNat 'EQ j m _ n rest = '(j, m + n) ': rest
   InsertSectorNat 'LT j m j2 n rest = '(j, m) ': '(j2, n) ': rest
   InsertSectorNat 'GT j m j2 n rest = '(j2, n) ': InsertSectorSU2 j m rest
 
-type family InsertSectorZ
-  (o :: Ordering) (j :: Z) (m :: Nat) (j2 :: Z) (n :: Nat) (rest :: [(Z, Nat)])
-  :: [(Z, Nat)] where
+type family
+  InsertSectorZ
+    (o :: Ordering)
+    (j :: Z)
+    (m :: Nat)
+    (j2 :: Z)
+    (n :: Nat)
+    (rest :: [(Z, Nat)]) ::
+    [(Z, Nat)]
+  where
   InsertSectorZ 'EQ j m _ n rest = '(j, m + n) ': rest
   InsertSectorZ 'LT j m j2 n rest = '(j, m) ': '(j2, n) ': rest
   InsertSectorZ 'GT j m j2 n rest = '(j2, n) ': InsertSectorU1 j m rest
@@ -120,19 +136,14 @@ type family TensorIrrepRepSU2 (j1 :: Nat) (j2 :: Nat) :: [(Nat, Nat)] where
 
 type family ScaleRep (s :: Nat) (xs :: [(Nat, Nat)]) :: [(Nat, Nat)] where
   ScaleRep _ '[] = '[]
-  ScaleRep s ('(j, n) ': xs) = '(j, Scale s n) ': ScaleRep s xs
+  ScaleRep s ('(j, n) ': xs) = '(j, s * n) ': ScaleRep s xs
 
 type family ToMultiplicityOneList (js :: [Nat]) :: [(Nat, Nat)] where
   ToMultiplicityOneList '[] = '[]
   ToMultiplicityOneList (j ': js) = '(j, 1) ': ToMultiplicityOneList js
 
 type family AbsDiff (a :: Nat) (b :: Nat) :: Nat where
-  AbsDiff a b = AbsDiffCmp (CmpNat a b) a b
-
-type family AbsDiffCmp (o :: Ordering) (a :: Nat) (b :: Nat) :: Nat where
-  AbsDiffCmp 'LT a b = b - a
-  AbsDiffCmp 'EQ _ _ = 0
-  AbsDiffCmp 'GT a b = a - b
+  AbsDiff a b = OrdCond (CmpNat a b) (b - a) 0 (a - b)
 
 type family RangeStep2 (lo :: Nat) (hi :: Nat) :: [Nat] where
   RangeStep2 lo hi = RangeStep2Cmp (CmpNat lo hi) lo hi

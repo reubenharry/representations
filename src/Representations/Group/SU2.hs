@@ -9,16 +9,17 @@
 -- first). The defining representation (@tj = 1@) is left-multiplication by the
 -- Cayley–Klein matrix @[[α, β], [-conj β, conj α]]@.
 module Representations.Group.SU2
-  ( SU2Element
-  , su2Alpha
-  , su2Beta
-  , su2Ident
-  , su2CayleyKlein
-  , su2FromQuaternion
-  , su2Mul
-  , su2Inv
-  , applyWigner
-  ) where
+  ( SU2Element,
+    su2Alpha,
+    su2Beta,
+    su2Ident,
+    su2CayleyKlein,
+    su2FromQuaternion,
+    su2Mul,
+    su2Inv,
+    applyWigner,
+  )
+where
 
 import Data.Complex (Complex (..), conjugate, magnitude)
 import Data.Maybe (fromMaybe)
@@ -30,8 +31,8 @@ import Numeric.LinearAlgebra.Static (C, Sized (create, extract))
 -- | Cayley–Klein parameters: @[[α, β], [-conj β, conj α]]@ with
 -- @|α|² + |β|² = 1@. Active rotations are @R_n(φ) = exp(-i φ n·σ / 2)@.
 data SU2Element = SU2Element
-  { su2Alpha :: !(Complex Double)
-  , su2Beta  :: !(Complex Double)
+  { su2Alpha :: !(Complex Double),
+    su2Beta :: !(Complex Double)
   }
   deriving (Eq, Show)
 
@@ -44,11 +45,11 @@ su2Ident = SU2Element 1 0
 su2CayleyKlein :: Complex Double -> Complex Double -> Maybe SU2Element
 su2CayleyKlein a b =
   let n2 = magnitude a * magnitude a + magnitude b * magnitude b
-  in  if n2 < 1e-32
+   in if n2 < 1e-32
         then Nothing
         else
           let s = (1 / sqrt n2) :+ 0
-          in  Just (SU2Element (s * a) (s * b))
+           in Just (SU2Element (s * a) (s * b))
 
 -- | Unit quaternion @(w, x, y, z)@ on @S³ ≅ SU(2)@, corresponding to the
 -- active rotation with @w = cos(φ/2)@ and @(x,y,z) = sin(φ/2) n@.
@@ -56,7 +57,7 @@ su2CayleyKlein a b =
 su2FromQuaternion :: Double -> Double -> Double -> Double -> Maybe SU2Element
 su2FromQuaternion w x y z =
   let nrm = sqrt (w * w + x * x + y * y + z * z)
-  in  if nrm < 1e-16
+   in if nrm < 1e-16
         then Nothing
         else
           let w' = w / nrm
@@ -66,7 +67,7 @@ su2FromQuaternion w x y z =
               -- α = w − i z,  β = −y − i x
               α = w' :+ (-z')
               β = (-y') :+ (-x')
-          in  Just (SU2Element α β)
+           in Just (SU2Element α β)
 
 -- | Group multiplication (matrix product of Cayley–Klein forms).
 su2Mul :: SU2Element -> SU2Element -> SU2Element
@@ -80,22 +81,28 @@ su2Inv (SU2Element a b) = SU2Element (conjugate a) (-b)
 -- | Apply @D^{tj/2}(g)@ to a vector in the CG magnetic basis.
 --
 -- The static dimension @n@ must equal @tj + 1@.
-applyWigner
-  :: forall n. KnownNat n
-  => Int
-  -> SU2Element
-  -> C n
-  -> C n
+applyWigner ::
+  forall n.
+  (KnownNat n) =>
+  Int ->
+  SU2Element ->
+  C n ->
+  C n
 applyWigner tj g v =
   let n = fromIntegral (natVal (Proxy @n))
       xs = VS.toList (extract v)
       ys = applyWignerList tj g xs
-  in  if n /= tj + 1
-        then error $
-          "Representations.Group.SU2.applyWigner: irrep dim " ++ show n
-            ++ " ≠ tj+1 = " ++ show (tj + 1)
-        else fromMaybe (error "Representations.Group.SU2.applyWigner: static size mismatch")
-          (create (VS.fromList ys))
+   in if n /= tj + 1
+        then
+          error $
+            "Representations.Group.SU2.applyWigner: irrep dim "
+              ++ show n
+              ++ " ≠ tj+1 = "
+              ++ show (tj + 1)
+        else
+          fromMaybe
+            (error "Representations.Group.SU2.applyWigner: static size mismatch")
+            (create (VS.fromList ys))
 
 applyWignerList :: Int -> SU2Element -> [Complex Double] -> [Complex Double]
 applyWignerList tj g vin
@@ -111,22 +118,22 @@ applyWignerList tj g vin
           β = su2Beta g
           αc = conjugate α
           βc = conjugate β
-      in  [ sum [ wignerElem n α β αc βc k' k * (vin !! k) | k <- [0 .. n] ]
+       in [ sum [wignerElem n α β αc βc k' k * (vin !! k) | k <- [0 .. n]]
           | k' <- [0 .. n]
           ]
 
 -- | Matrix element @⟨k'| D^{n/2} |k⟩@ in the highest-weight-first basis
 -- (@k@ = number of downs). Derived from @U^{⊗ n}@ on the symmetric subspace,
 -- so @tj = 1@ recovers the Cayley–Klein matrix.
-wignerElem
-  :: Int
-  -> Complex Double
-  -> Complex Double
-  -> Complex Double
-  -> Complex Double
-  -> Int
-  -> Int
-  -> Complex Double
+wignerElem ::
+  Int ->
+  Complex Double ->
+  Complex Double ->
+  Complex Double ->
+  Complex Double ->
+  Int ->
+  Int ->
+  Complex Double
 wignerElem n α β αc βc k' k =
   let rLo = max 0 (k' - k)
       rHi = min k' (n - k)
@@ -137,7 +144,7 @@ wignerElem n α β αc βc k' k =
           * cpow (-βc) r
           * cpow β (k - k' + r)
           * cpow αc (k' - r)
-  in  pref * sum [ term r | r <- [rLo .. rHi] ]
+   in pref * sum [term r | r <- [rLo .. rHi]]
 
 cpow :: Complex Double -> Int -> Complex Double
 cpow _ p | p < 0 = error "Representations.Group.SU2.cpow: negative exponent"
@@ -155,4 +162,4 @@ binom n k
             | i > k' = acc
             | otherwise =
                 go (acc * fromIntegral (n - k' + i) / fromIntegral i) (i + 1)
-      in  go 1.0 1
+       in go 1.0 1

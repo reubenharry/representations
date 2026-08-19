@@ -1,39 +1,41 @@
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | A runtime singleton for a representation spine @'Rep g'@ — a list of
 -- @(irrep label, multiplicity)@ sectors. This is the value that label-keyed
 -- recursions (composition, application) walk to drive type-family reduction.
 --
--- We deliberately avoid @singletons-base@ (and its @Sing@ instances for lists\/
--- tuples); this bespoke spine carries exactly what the recursions need — the
--- irrep singleton and a @KnownNat@ multiplicity witness per sector — and
--- nothing else.
+-- Promoted list ops come from @singletons-base@; this spine is still bespoke
+-- because it is group-indexed (so @Rep g@ reduces under matching) and carries
+-- a @KnownNat@ multiplicity rather than a full @Sing m@.
 module Representations.Rep.Singleton
-  ( SRep(..)
-  , KnownRep(..)
-  ) where
+  ( SRep (..),
+    KnownRep (..),
+  )
+where
 
-import GHC.TypeLits (KnownNat)
 import Data.Singletons (Sing, SingI, sing)
+import GHC.TypeLits (KnownNat)
 import Representations.Group (Group (..), Rep)
-import Representations.Group.ChargeEq ()  -- SingI instances for the U(1) charge kind Z
+import Representations.Group.ChargeEq ()
+
+-- SingI instances for the U(1) charge kind Z
 
 -- | The singleton for a rep spine: one 'Sing' irrep label and a 'KnownNat'
 -- multiplicity per sector. Constructors are indexed by @g@ so @'Rep g'@ reduces
 -- under pattern matching.
 data SRep (g :: Group) (r :: Rep g) where
-  SRepNilU1   :: SRep U1 '[]
-  SRepNilSU2  :: SRep SU2 '[]
-  SRepCons    :: forall z m rs. KnownNat m => Sing z -> SRep U1 rs -> SRep U1 ('(z, m) ': rs)
+  SRepNilU1 :: SRep U1 '[]
+  SRepNilSU2 :: SRep SU2 '[]
+  SRepCons :: forall z m rs. (KnownNat m) => Sing z -> SRep U1 rs -> SRep U1 ('(z, m) ': rs)
   SRepConsSU2 :: forall j m rs. (KnownNat j, KnownNat m) => Sing j -> SRep SU2 rs -> SRep SU2 ('(j, m) ': rs)
 
 -- | Materialize the 'SRep' singleton for a statically-known rep.

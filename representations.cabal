@@ -46,6 +46,7 @@ library
         adjunctions,
         singletons,
         singletons-th ^>=3.3,
+        singletons-base ^>=3.3,
         transformers,
         random,
         linear,

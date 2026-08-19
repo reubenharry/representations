@@ -1,3 +1,4 @@
 {
-  "haskell.sessionLoading": "singleComponent"
+  "haskell.sessionLoading": "singleComponent",
+  "haskell.formattingProvider": "ormolu"
 }

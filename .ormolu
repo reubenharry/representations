@@ -1,0 +1,5 @@
+infixr 0 -+$>
+infixl 7 ⊗
+infixr 7 ⊗^
+infixr 1 -&>
+infixr 5 :&

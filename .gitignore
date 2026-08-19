@@ -1,4 +1,5 @@
 dist-newstyle/
+.cabal/
 cabal.project.freeze
 *.o
 *.hi
