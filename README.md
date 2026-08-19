@@ -28,8 +28,8 @@ indicating a type error: the second vector is in $\mathbb{C}^2$, but should be i
 The real point of this library is to write symmetry-respecting linear maps (intertwiners). Like TensorKit, the representation of intertwiners takes advantage of Schur's lemma to massively reduce the amount of storage needed for a large linear map. Unlike TensorKit, everything is checked at compile time. For instance:
 
 ```haskell
-f :: ('REP '[2 `Of` SpinHalf] :⊗: 'REP '[1 `Of` SpinHalf]) --> 'REP ((2 `Of` SpinZero) ⊕ (1 `Of` SpinOne))
-exampleDupHalfInter = intertwiner (   
+f :: ('REP '[2 × SpinHalf] :⊗: 'REP '[1 × SpinHalf]) --> 'REP ((2 × SpinZero) ⊕ (1 × SpinOne))
+f = intertwiner (   
 
   mkBlock (mat (1, 0, 0, 1))
   (mkBlock (mat (1, 1))
@@ -37,7 +37,7 @@ exampleDupHalfInter = intertwiner (
   InterNil )) `Comp`Fuse
 ```
 
-Here, the type should be read as: $f : 2 \times \frac{1}{2} \otimes 1 \times \frac{1}{2} \rightarrow 2 \times 0 \oplus 1 \times 1$, where $\rightarrow$ here means an intertwiner, not just a generic linear map. 
+Here, the type should be read as: $f : (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \rightarrow (2 \times 0) \oplus (1 \times 1)$, where $\rightarrow$ here means an intertwiner, not just a generic linear map. 
 
 As before, the type is really checked. If you change the spaces of the matrices built by `mat`, the code will be underlined in red in your editor and won't compile.
 

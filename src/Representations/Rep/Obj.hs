@@ -12,7 +12,7 @@
 --
 -- @'I@ is the monoidal unit (@C 1@); @'REP r@ is a reduced spine; @a ':⊗: b@
 -- is the unfused external tensor product (not yet regrouped by total charge /
--- CG). Sector pairs are @m `Of` j@ (same as @'(j, m)@).
+-- CG). Sector pairs are @m × j@ or @m `Of` j@ (same as @'(j, m)@).
 --
 -- Note: infix data constructors must start with @:@, so the product is
 -- @(:⊗:)@ rather than bare @⊗@ (which would also clash visually with the
@@ -25,6 +25,7 @@ module Representations.Rep.Obj
     ToSectors,
     RepAppend,
     type Of,
+    type (×),
     type (⊕),
   )
 where
@@ -45,6 +46,12 @@ data RepObj (g :: Group) where
 -- | @m `Of` j@ ≡ multiplicity @m@ of irrep @j@ (flips @'(j, m)@).
 type (m :: Nat) `Of` j = '(j, m)
 
+-- | Unicode alias: @m × j@ (read as multiplicity × irrep). Not @⊗@ — that is
+-- the vector-space / monoidal product elsewhere in this library.
+type (m :: Nat) × j = m `Of` j
+
+infixl 7 ×
+
 -- | Append two reduced spines (direct sum).
 type family RepAppend (g :: Group) (xs :: Rep g) (ys :: Rep g) :: Rep g where
   RepAppend U1 '[] ys = ys
@@ -53,7 +60,7 @@ type family RepAppend (g :: Group) (xs :: Rep g) (ys :: Rep g) :: Rep g where
   RepAppend SU2 (x ': xs) ys = x ': RepAppend SU2 xs ys
 
 -- | Combine irrep sectors into a spine, e.g.
--- @'(2 `Of` SpinZero) ⊕ (1 `Of` SpinOne)@.
+-- @'(2 × SpinZero) ⊕ (1 × SpinOne)@.
 -- Nested @⊕@ builds longer spines (@infixr 7@).
 type family (⊕) (a :: k) (b :: l) :: Rep g where
   -- U(1): irrep labels are 'Z'
