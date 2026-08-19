@@ -39,7 +39,7 @@ f = intertwiner (
 
 Here, the type should be read as: 
 
-$$f : (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \rightarrow (2 \times 0) \oplus (1 \times 1)$$,
+$$f \quad : \quad (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \implies (2 \times 0) \oplus (1 \times 1)$$,
 
 where $\rightarrow$ here means an intertwiner, not just a generic linear map. 
 
