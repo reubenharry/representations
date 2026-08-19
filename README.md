@@ -37,9 +37,11 @@ f = intertwiner (
   InterNil )) `Comp`Fuse
 ```
 
-Here, the type should be read as: $f : (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \rightarrow (2 \times 0) \oplus (1 \times 1)$, where $\rightarrow$ here means an intertwiner, not just a generic linear map. 
+Here, the type should be read as: 
 
-As before, the type is really checked. If you change the spaces of the matrices built by `mat`, the code will be underlined in red in your editor and won't compile.
+$$f : (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \rightarrow (2 \times 0) \oplus (1 \times 1)$$, where $\rightarrow$ here means an intertwiner, not just a generic linear map. 
+
+As before, the type is really checked. If you change the spaces of the matrices built by `mat` in the body of the definition of `f`, the code will be underlined in red in your editor and won't compile.
 
 But Haskell also *infers* types for you, so if in your editor you mouse over the first occurrence of `mat` above, it will tell you that the block has the shape of a $2 \times 2$ matrix. I find this extremely helpful as a user of the code.
 
