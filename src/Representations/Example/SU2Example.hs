@@ -24,7 +24,7 @@ import Data.VectorSpace (AdditiveGroup ((^+^)))
 import Math.LinearMap.Asserted (getLinearFunction, type (-+>))
 import Math.LinearMap.Category ((⊗), type (+>), type (⊗))
 import Math.VectorSpace.DimensionAware (toArray)
-import Numeric.LinearAlgebra.Static (C, Sized (..))
+import Numeric.LinearAlgebra.Static (C, Sized (..), M)
 import Representations.Group (Group (SU2), IntertwinerHom)
 import Representations.Intertwiner
   ( HasIntertwiner,
@@ -40,6 +40,8 @@ import Representations.Rep.Tensor (Tensor)
 import Representations.Utils (mat, vec)
 import qualified Test.QuickCheck as QC
 import Prelude hiding (id, (.))
+import GHC.TypeLits (KnownNat)
+import Representations.Rep.HomBlock (HomBlockDim)
 
 example1 :: C 2
 example1 = vec (1, 2)
@@ -49,7 +51,7 @@ example2 = vec (5, 6, 4)
 
 exampleTensorSum :: C 3 ⊗ C 2
 exampleTensorSum =
-  (vec (5, 6, 4) ⊗ vec (1, 2)) ^+^ (vec (5, 7, 4) ⊗ vec (1, 2))
+  vec (5, 6, 4) ⊗ vec (1, 2)
 
 -- | Singlet ⊕ triplet (the CG image of ½ ⊗ ½).
 type SingletTriplet = (2 `Of` 0) ⊕ (3 `Of` 2)
@@ -220,20 +222,28 @@ type SpinHalf = 1
 type SpinZero = 0
 type SpinOne = 2
 
-type DupHalfTarget = (2 `Of` SpinZero) ⊕ (1 `Of` SpinOne)
 
--- | Fuse (2×½)⊗½, then retain singlet + triplet sectors.
-exampleDupHalfInter ::
-  ('REP '[2 `Of` SpinHalf] :⊗: 'REP '[1 `Of` SpinHalf])
-    -&> 'REP DupHalfTarget
-exampleDupHalfInter =
-  Comp
-    ( intertwiner
-        ( InterCons (mat (1, 0, 0, 1)) (InterCons (mat (1, 1)) InterNil)
-        )
-        :: Mor SU2 ('REP '[2 `Of` 0, 2 `Of` 2]) ('REP DupHalfTarget)
-    )
-    Fuse
+mkBlock ::
+    ( KnownNat m,
+      KnownNat n,
+      KnownNat (HomBlockDim m n)
+    ) =>
+    M m n ->
+    IntertwinerSectors g rest ->
+    IntertwinerSectors g ('(j, m, n) ': rest)
+
+mkBlock = InterCons
+
+
+-- | Fuse (2×½)⊗½, then retain singlet + triplet sectors at @'[2 `Of` 0, 1 `Of` 2]@.
+exampleDupHalfInter :: ('REP '[2 `Of` SpinHalf] :⊗: 'REP '[1 `Of` SpinHalf]) -&> 'REP ((2 `Of` SpinZero) ⊕ (1 `Of` SpinOne))
+exampleDupHalfInter = intertwiner (   
+
+  mkBlock (mat (1, 0, 0, 1))
+  (mkBlock (mat (1, 1))
+
+  InterNil )) `Comp`Fuse
+
 
 -- exampleDupHalfMap :: C 2 -+> C 4
 -- exampleDupHalfMap = fmap' exampleDupHalf

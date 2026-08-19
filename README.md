@@ -28,7 +28,7 @@ indicating a type error: the second vector is in $\mathbb{C}^2$, but should be i
 The real point of this library is to write symmetry-respecting linear maps (intertwiners). Like TensorKit, the representation of intertwiners takes advantage of Schur's lemma to massively reduce the amount of storage needed for a large linear map. Unlike TensorKit, everything is checked at compile time. For instance:
 
 ```haskell
-f :: ('REP '[2 × SpinHalf] :⊗: 'REP '[1 × SpinHalf]) --> 'REP ((2 × SpinZero) ⊕ (1 × SpinOne))
+f :: (REP [2 × SpinHalf] :⊗: REP [1 × SpinHalf]) --> REP ((2 × SpinZero) ⊕ (1 × SpinOne))
 f = intertwiner (   
 
   mkBlock (mat (1, 0, 0, 1))
@@ -43,9 +43,9 @@ $$f \quad : \quad (2 \times \frac{1}{2}) \otimes (1 \times \frac{1}{2}) \implies
 
 where $\implies$ here means an intertwiner, not just a generic linear map. 
 
-As before, the type is really checked. If you change the spaces of the matrices built by `mat` in the body of the definition of `f`, the code will be underlined in red in your editor and won't compile.
+As before, the type is really checked. If you change the spaces of the matrices built by `mat` in the body of the definition of `f`, the code will be underlined in red in your editor and won't compile. This means that *at compile time*, the library uses the Clebsch–Gordan rules to compute the correct dimensions of the blocks.
 
-But Haskell also *infers* types for you, so if in your editor you mouse over the first occurrence of `mat` above, it will tell you that the block has the shape of a $2 \times 2$ matrix. I find this extremely helpful as a user of the code.
+But Haskell also is smart enough to *infer* types for you, so if in your editor you mouse over the first occurrence of `mat` above, it will tell you that the block has the shape of a $2 \times 2$ matrix. I find this extremely helpful as a user of the code.
 
 ## Why do this?
 
@@ -64,3 +64,6 @@ Getting this to work requires quite a bit of type-level programming, including s
 
 Type-level programming is a bit of an art in Haskell, since it pushes the limits of the type system, often with experimental features. Since I don't particularly care *how* the fancy dependent types are implemented with singletons and so on, this is where I delegated the most to AI.
 
+## Using the library
+
+This is still a work in progress. It compiles and works, but if you're interested in using it, you should probably contact me for help.
