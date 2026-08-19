@@ -17,7 +17,11 @@ Haskell really checks this. For example, if you write
 x = vec (1,2) ⊗ vec (4,5)
 ```
 
-you will see ![](example.png) under the second vector, indicating a type error: the second vector is in $\mathbb{C}^2$, but should be in $\mathbb{C}^3$, given the stated type. The code will not compile.
+you will see the mistake underlined in red, like so:
+
+![](example.png) 
+
+indicating a type error: the second vector is in $\mathbb{C}^2$, but should be in $\mathbb{C}^3$, given the stated type. The code will not compile.
 
 ## Clebsch–Gordan rules and fusion in the types
 
