@@ -4,11 +4,11 @@
 
 -- | SU(2) group elements and irrep action (Wigner @D^j@).
 --
--- Magnetic-index convention matches 'Symmetry.CG.SU2': @tj@ is twice the spin,
+-- Magnetic-index convention matches 'Representations.CG.SU2': @tj@ is twice the spin,
 -- dimension @tj + 1@, and index @k = 0 .. tj@ is @tm = tj - 2k@ (highest weight
 -- first). The defining representation (@tj = 1@) is left-multiplication by the
 -- Cayley–Klein matrix @[[α, β], [-conj β, conj α]]@.
-module Symmetry.SU2
+module Representations.Group.SU2
   ( SU2Element
   , su2Alpha
   , su2Beta
@@ -92,16 +92,16 @@ applyWigner tj g v =
       ys = applyWignerList tj g xs
   in  if n /= tj + 1
         then error $
-          "Symmetry.SU2.applyWigner: irrep dim " ++ show n
+          "Representations.Group.SU2.applyWigner: irrep dim " ++ show n
             ++ " ≠ tj+1 = " ++ show (tj + 1)
-        else fromMaybe (error "Symmetry.SU2.applyWigner: static size mismatch")
+        else fromMaybe (error "Representations.Group.SU2.applyWigner: static size mismatch")
           (create (VS.fromList ys))
 
 applyWignerList :: Int -> SU2Element -> [Complex Double] -> [Complex Double]
 applyWignerList tj g vin
   | length vin /= tj + 1 =
       error $
-        "Symmetry.SU2.applyWigner: expected length "
+        "Representations.Group.SU2.applyWigner: expected length "
           ++ show (tj + 1)
           ++ ", got "
           ++ show (length vin)
@@ -140,7 +140,7 @@ wignerElem n α β αc βc k' k =
   in  pref * sum [ term r | r <- [rLo .. rHi] ]
 
 cpow :: Complex Double -> Int -> Complex Double
-cpow _ p | p < 0 = error "Symmetry.SU2.cpow: negative exponent"
+cpow _ p | p < 0 = error "Representations.Group.SU2.cpow: negative exponent"
 cpow _ 0 = 1
 cpow z p = z ^ p
 

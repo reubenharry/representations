@@ -6,19 +6,19 @@
 
 -- | SU(2) Clebsch–Gordan fuse: unfused product basis → fused multiplet layout.
 --
--- Conventions (matching 'Symmetry.Group' / 'Symmetry.Tensor'):
+-- Conventions (matching 'Representations.Group' / 'Representations.Rep.Tensor'):
 --
 --   * @tj@ is twice the spin; irrep dimension is @tj + 1@.
 --   * Magnetic index @k = 0 .. tj@ corresponds to @tm = tj - 2k@ (highest weight first).
 --   * Sector storage is multiplicity ⊗ irrep (mult slow, @m@ fast), matching
---     'Symmetry.HomBlock.su2ExpandBlock'.
+--     'Representations.Rep.HomBlock.su2ExpandBlock'.
 --   * @C n ⊗ C m@ via 'toArray' uses second-factor-fastest: @i*m + j@.
 --   * Fused output matches coalesced @'Tensor' SU2 r q@: sectors sorted by @tj@,
 --     equal-@tj@ contributions merged into one multiplicity (CG walk order
 --     within each @tj@).
 --
 -- Built by highest-weight + @J−@ (Condon–Shortley).
-module Symmetry.CG.SU2
+module Representations.CG.SU2
   ( fuseSU2Flat
   , cgMatrixTwoIrreps
   , fusionChannels
@@ -34,8 +34,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as MVS
 import GHC.TypeLits (natVal)
-import Symmetry.Group (Group (SU2))
-import Symmetry.RepSingleton (SRep (..))
+import Representations.Group (Group (SU2))
+import Representations.Rep.Singleton (SRep (..))
 
 -- | Total-@tj@ channels in @j1 ⊗ j2@ (same order as 'TensorIrrepRepSU2').
 fusionChannels :: Int -> Int -> [Int]
@@ -62,7 +62,7 @@ normalize :: [Double] -> [Double]
 normalize v =
   let n = sqrt (norm2 v)
   in  if n < 1e-14
-        then error "Symmetry.CG.SU2: cannot normalize null vector"
+        then error "Representations.CG.SU2: cannot normalize null vector"
         else map (/ n) v
 
 subtractProj :: [Double] -> [Double] -> [Double]

@@ -12,7 +12,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
--- | R-symbols as @IntertwinerG@ between @Tensor r q@ and @Tensor q r@.
+-- | R-symbols as @Intertwiner@ between @Tensor r q@ and @Tensor q r@.
 --
 -- Definition matching the forgetful braiding: @R = Fuse_{q,r} ∘ Swap ∘ Fuse_{r,q}†@.
 --
@@ -21,7 +21,7 @@
 -- * __SU(2):__ densify that conjugation against 'fuseSU2Flat', then pack Schur
 --   blocks ('PackSchur'). Closed-form @(-1)^{j₁+j₂-j}@ on single channels is
 --   equivalent; the dense path stays CG-coherent for general spines.
-module Symmetry.CG.RSymbol
+module Representations.CG.RSymbol
   ( rSymbolHomU1
   , rSymbolHomU1Inv
   , rSymbolHomSU2
@@ -32,12 +32,12 @@ import Data.Complex (Complex (..))
 import Data.Proxy (Proxy (..))
 import qualified Data.Vector.Storable as VS
 import qualified Numeric.LinearAlgebra as HM
-import Symmetry.CG.FSymbol (BuildEyeHomG (..), PackSchur (..))
-import Symmetry.CG.SU2 (fuseSU2Flat, repDimOf, sectorsSU2)
-import Symmetry.FunctorExperiment (IntertwinerG (..))
-import Symmetry.Group (Group (..), IntertwinerHom)
-import Symmetry.RepSingleton (KnownRep (..), SRep)
-import Symmetry.Tensor (Tensor)
+import Representations.CG.FSymbol (PackSchur (..))
+import Representations.CG.SU2 (fuseSU2Flat, repDimOf, sectorsSU2)
+import Representations.Intertwiner (Intertwiner (..), BuildIdHom (..))
+import Representations.Group (Group (..), IntertwinerHom)
+import Representations.Rep.Singleton (KnownRep (..), SRep)
+import Representations.Rep.Tensor (Tensor)
 
 type ℂ = Complex Double
 
@@ -50,28 +50,28 @@ rSymbolHomU1
      ( KnownRep U1 r, KnownRep U1 q
      , KnownRep U1 (Tensor U1 r q)
      , KnownRep U1 (Tensor U1 q r)
-     , BuildEyeHomG U1
+     , BuildIdHom U1
          (IntertwinerHom U1 (Tensor U1 r q) (Tensor U1 q r))
      )
   => Proxy r -> Proxy q
-  -> IntertwinerG U1 (Tensor U1 r q) (Tensor U1 q r)
+  -> Intertwiner U1 (Tensor U1 r q) (Tensor U1 q r)
 rSymbolHomU1 _ _ =
   MkIntertwiner
-    (eyeHom @U1 @(IntertwinerHom U1 (Tensor U1 r q) (Tensor U1 q r)))
+    (idHom @U1 @(IntertwinerHom U1 (Tensor U1 r q) (Tensor U1 q r)))
 
 rSymbolHomU1Inv
   :: forall r q.
      ( KnownRep U1 r, KnownRep U1 q
      , KnownRep U1 (Tensor U1 r q)
      , KnownRep U1 (Tensor U1 q r)
-     , BuildEyeHomG U1
+     , BuildIdHom U1
          (IntertwinerHom U1 (Tensor U1 q r) (Tensor U1 r q))
      )
   => Proxy r -> Proxy q
-  -> IntertwinerG U1 (Tensor U1 q r) (Tensor U1 r q)
+  -> Intertwiner U1 (Tensor U1 q r) (Tensor U1 r q)
 rSymbolHomU1Inv _ _ =
   MkIntertwiner
-    (eyeHom @U1 @(IntertwinerHom U1 (Tensor U1 q r) (Tensor U1 r q)))
+    (idHom @U1 @(IntertwinerHom U1 (Tensor U1 q r) (Tensor U1 r q)))
 
 --------------------------------------------------------------------------------
 -- SU(2): dense Fuse ∘ Swap ∘ Fuse†
@@ -118,7 +118,7 @@ rSymbolHomSU2
          (IntertwinerHom SU2 (Tensor SU2 r q) (Tensor SU2 q r))
      )
   => Proxy r -> Proxy q
-  -> IntertwinerG SU2 (Tensor SU2 r q) (Tensor SU2 q r)
+  -> Intertwiner SU2 (Tensor SU2 r q) (Tensor SU2 q r)
 rSymbolHomSU2 _ _ =
   let sr = repSing @SU2 @r
       sq = repSing @SU2 @q
@@ -142,7 +142,7 @@ rSymbolHomSU2Inv
          (IntertwinerHom SU2 (Tensor SU2 q r) (Tensor SU2 r q))
      )
   => Proxy r -> Proxy q
-  -> IntertwinerG SU2 (Tensor SU2 q r) (Tensor SU2 r q)
+  -> Intertwiner SU2 (Tensor SU2 q r) (Tensor SU2 r q)
 rSymbolHomSU2Inv _ _ =
   let sr = repSing @SU2 @r
       sq = repSing @SU2 @q

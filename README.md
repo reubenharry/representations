@@ -1,8 +1,6 @@
-# symmetry
+# representations
 
 Exploratory Haskell library for symmetry-respecting linear maps, in the vein of TensorKit.
-
-Extracted from the `quantum` tensor-network repo so this layer can be cleaned up on its own.
 
 The unique feature is that it is written in Haskell, which has a type system that is much more expressive than Julia, and can encode the relevant mathematical structure at compile time. For example, we can write
 
@@ -36,5 +34,5 @@ This library is an exploration of the idea that tensor network libraries should 
 Depends on a sibling checkout of `linearmap-family` (same layout as `quantum`):
 
 ```bash
-cabal build symmetry:lib:symmetry
+cabal build representations:lib:representations
 ```

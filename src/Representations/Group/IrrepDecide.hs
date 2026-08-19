@@ -8,14 +8,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Singleton-level irrep equality, indexed by 'Group'.
-module Symmetry.IrrepDecide
+module Representations.Group.IrrepDecide
   ( IrrepEqResult (..)
   , IrrepDecide (..)
   ) where
 
 import Data.Singletons (Sing)
-import Symmetry.ChargeEq (NatEqResult (..), ZEqResult (..), sNatEq, sZEq)
-import Symmetry.Group (Group (..), Irreps, IrrepEq)
+import Representations.Group.ChargeEq (NatEqResult (..), ZEqResult (..), sNatEq, sZEq)
+import Representations.Group (Group (..), Irreps, IrrepEq)
 
 data IrrepEqResult (g :: Group) (a :: Irreps g) (b :: Irreps g) where
   IrrepEqTrue  :: (IrrepEq g a b ~ 'True)  => IrrepEqResult g a b

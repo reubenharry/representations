@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               symmetry
+name:               representations
 version:            0.1.0.0
 synopsis:           Statically typed symmetry-respecting linear maps
 license:            BSD-3-Clause
@@ -17,31 +17,26 @@ common warnings
 library
     import:           warnings
     exposed-modules:
-        Symmetry.Utils
-        Symmetry.Orphans
-        Symmetry.ChargeEq
-        Symmetry.Group
-        Symmetry.SU2
-        Symmetry.IrrepDecide
-        Symmetry.RepSingleton
-        Symmetry.HomBlock
-        Symmetry.Tensor
-        Symmetry.CG.SU2
-        Symmetry.CG.U1
-        Symmetry.CG.FSymbol
-        Symmetry.CG.RSymbol
-        Symmetry.RepObj
-        Symmetry.RepSectors
-        Symmetry.RepMor
-        Symmetry.Intertwiner.Pretty
-        Symmetry.FunctorExperiment
-        Symmetry.FunctorU1
-        Symmetry.FunctorSU2
-        Symmetry.FunctorU1Simple
-        Symmetry.DirectSum
-        Random.Maps
-    other-modules:
-        Symmetry.Categorical
+        Representations.Utils
+        Representations.Group
+        Representations.Group.SU2
+        Representations.Group.ChargeEq
+        Representations.Group.IrrepDecide
+        Representations.Rep.Obj
+        Representations.Rep.Tensor
+        Representations.Rep.Singleton
+        Representations.Rep.HomBlock
+        Representations.Rep.Sectors
+        Representations.Intertwiner
+        Representations.Intertwiner.Pretty
+        Representations.Intertwiner.Random
+        Representations.Mor
+        Representations.CG.SU2
+        Representations.CG.U1
+        Representations.CG.FSymbol
+        Representations.CG.RSymbol
+        Representations.Example.SU2Example
+        Representations.Example.U1Example
     build-depends:
         base ^>=4.19.2.0,
         linearmap-category >= 0.6 && < 0.7,

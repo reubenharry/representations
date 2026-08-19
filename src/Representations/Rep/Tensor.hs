@@ -9,24 +9,23 @@
 --
 -- @'Tensor' g r q@ is the __coalesced__ fused spine: each irrep label appears at
 -- most once, multiplicities summed, sectors sorted by irrep label. That is the
--- layout expected by 'IntertwinerG' \/ F-symbols (multiplicity = fusion-channel
+-- layout expected by 'Intertwiner' \/ F-symbols (multiplicity = fusion-channel
 -- space). The raw unfused CG branching before coalesce is 'TensorRaw'.
 --
--- Runtime fuse maps ('Symmetry.CG.SU2.fuseSU2Flat', U(1) forget) must emit this
+-- Runtime fuse maps ('Representations.CG.SU2.fuseSU2Flat', U(1) forget) must emit this
 -- same coalesced order.
-module Symmetry.Tensor
+module Representations.Rep.Tensor
   ( Tensor
   , TensorRaw
   , TensorOne
-  , TensorU1
   , TensorIrrepRepSU2
   , Coalesce
   , InsertSector
   ) where
 
 import GHC.TypeLits (Nat, CmpNat, type (+), type (-))
-import Symmetry.Group (Group (..), Irreps, Rep)
-import Symmetry.Utils (Add, Append, Scale, Z (..))
+import Representations.Group (Group (..), Irreps, Rep)
+import Representations.Utils (Add, Append, Scale, Z (..))
 
 -- | Fused spine @r ⊗ q@, coalesced and sorted by irrep.
 type family Tensor (g :: Group) (r :: Rep g) (q :: Rep g) :: Rep g where
@@ -50,8 +49,6 @@ type family TensorOne (g :: Group) (x :: (Irreps g, Nat)) (q :: Rep g) :: Rep g 
     Append
       (ScaleRep (Scale m n) (TensorIrrepRepSU2 i j))
       (TensorOne SU2 '(i, m) qs)
-
-type TensorU1 (r :: Rep U1) (q :: Rep U1) = Tensor U1 r q
 
 --------------------------------------------------------------------------------
 -- Coalesce: merge equal irreps, sort by label

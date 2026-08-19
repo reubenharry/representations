@@ -12,9 +12,8 @@
 {-# LANGUAGE PolyKinds #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
--- | Sampling of Schur-block intertwiners (the part of @quantum@'s
--- @Random.Maps@ that @Symmetry.FunctorSU2@ needs).
-module Random.Maps
+-- | Sampling of Schur-block intertwiners.
+module Representations.Intertwiner.Random
   ( genGaussian
   , genComplexGaussian
   , genMat
@@ -29,10 +28,10 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat, Nat, natVal, type (*))
 import Numeric.LinearAlgebra.Static (M, Sized (fromList))
 import qualified Test.QuickCheck as QC
-import Symmetry.FunctorExperiment
-  ( IntertwinerG (..), IntertwinerSectorsG (..) )
-import Symmetry.Group (Group (..), Irreps, IntertwinerHom)
-import Symmetry.HomBlock (HomBlockDim, CoeffBlock (..))
+import Representations.Intertwiner
+  ( Intertwiner (..), IntertwinerSectors (..) )
+import Representations.Group (Group (..), Irreps, IntertwinerHom)
+import Representations.Rep.HomBlock (HomBlockDim, CoeffBlock (..))
 
 --------------------------------------------------------------------------------
 -- Scalars
@@ -68,7 +67,7 @@ genCoeffBlock = CoeffBlock <$> genMat @m @n
 
 -- | Draw one independent coefficient block per hom-sector entry.
 class GenHomSectors (g :: Group) (hom :: [(Irreps g, Nat, Nat)]) where
-  genHomSectors :: QC.Gen (IntertwinerSectorsG g hom)
+  genHomSectors :: QC.Gen (IntertwinerSectors g hom)
 
 instance GenHomSectors U1 '[] where
   genHomSectors = pure InterNil
@@ -76,7 +75,7 @@ instance GenHomSectors U1 '[] where
 instance
   ( KnownNat m, KnownNat n, KnownNat (HomBlockDim m n)
   , GenHomSectors U1 rest
-  ) => GenHomSectors U1 ('(z, m, n) ': rest) where
+  ) => GenHomSectors U1 ('(j, m, n) ': rest) where
   genHomSectors = InterCons <$> genCoeffBlock @m @n <*> genHomSectors
 
 instance GenHomSectors SU2 '[] where
@@ -91,5 +90,5 @@ instance
 genIntertwiner
   :: forall g r q
    . GenHomSectors g (IntertwinerHom g r q)
-  => QC.Gen (IntertwinerG g r q)
+  => QC.Gen (Intertwiner g r q)
 genIntertwiner = MkIntertwiner <$> genHomSectors

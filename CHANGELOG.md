@@ -1,4 +1,4 @@
-# Revision history for symmetry
+# Revision history for representations
 
 ## 0.1.0.0 -- 2026-08-18
 

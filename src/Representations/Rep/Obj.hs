@@ -16,7 +16,7 @@
 -- Note: infix data constructors must start with @:@, so the product is
 -- @(:⊗:)@ rather than bare @⊗@ (which would also clash visually with the
 -- vector-space operator from 'Math.LinearMap.Category').
-module Symmetry.RepObj
+module Representations.Rep.Obj
   ( RepObj (..)
   , ToVector
   , SectorVec
@@ -30,7 +30,7 @@ import Data.Kind (Type)
 import GHC.TypeLits (Nat)
 import Math.LinearMap.Category (type (⊗))
 import Numeric.LinearAlgebra.Static (C)
-import Symmetry.Group (Group (..), IrrepDim, Irreps, Rep, RepDimG)
+import Representations.Group (Group (..), IrrepDim, Irreps, Rep, RepDim)
 
 -- | Object of the rep category: unit, reduced spine, or nested unfused product.
 data RepObj (g :: Group) where
@@ -45,7 +45,7 @@ type (m :: Nat) `Of` j = '(j, m)
 -- | Image of the forgetful functor (group-indexed).
 type family ToVector (g :: Group) (o :: RepObj g) :: Type where
   ToVector g 'I         = C 1
-  ToVector g ('REP r)   = C (RepDimG g r)
+  ToVector g ('REP r)   = C (RepDim g r)
   ToVector g (a ':⊗: b) = ToVector g a ⊗ ToVector g b
 
 -- | One isotypical summand: multiplicity ⊗ irrep.
@@ -65,5 +65,4 @@ type family RepToSectors (g :: Group) (r :: Rep g) :: Type where
 type family ToSectors (g :: Group) (o :: RepObj g) :: Type where
   ToSectors g 'I         = C 1
   ToSectors g (a ':⊗: b) = ToSectors g a ⊗ ToSectors g b
-  ToSectors U1 ('REP r)  = RepToSectors U1 r
-  ToSectors SU2 ('REP r) = RepToSectors SU2 r
+  ToSectors g ('REP r)   = RepToSectors g r

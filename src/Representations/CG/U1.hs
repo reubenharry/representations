@@ -6,11 +6,11 @@
 
 -- | U(1) fuse into coalesced charge layout matching @'Tensor' U1@.
 --
--- Input is the Kronecker @toArray@ buffer of @C (RepDim r) ⊗ C (RepDim q)@
+-- Input is the Kronecker @toArray@ buffer of @C (RepDim U1 r) ⊗ C (RepDim U1 q)@
 -- (second factor fastest). Output groups equal total charges, sorted by
 -- @chargeInteger@ (same order as type-level @CmpZ@), with multiplicity copies
 -- contiguous.
-module Symmetry.CG.U1
+module Representations.CG.U1
   ( fuseU1Flat
   ) where
 
@@ -21,9 +21,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as MVS
 import GHC.TypeLits (natVal)
-import Symmetry.ChargeEq (chargeInteger)
-import Symmetry.Group (Group (U1))
-import Symmetry.RepSingleton (SRep (..))
+import Representations.Group.ChargeEq (chargeInteger)
+import Representations.Group (Group (U1))
+import Representations.Rep.Singleton (SRep (..))
 
 -- | @(charge, multiplicity, flat offset)@ for a U(1) spine.
 sectorsU1 :: SRep U1 r -> [(Integer, Int, Int)]

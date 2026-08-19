@@ -10,8 +10,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -22,26 +20,21 @@
 -- @m × n@ scalar coefficients, each acting as @λ · I@ on the irrep factor.
 -- U(1) embeds those coefficients directly as @M m n@; SU(2) expands via
 -- @kron(coeffMat, I_{j+1})@.
-module Symmetry.HomBlock where
+module Representations.Rep.HomBlock where
 
 import Data.Complex (Complex)
 import Data.Maybe (fromMaybe)
-import Data.Vector.Storable (toList)
 import GHC.TypeLits (Nat, KnownNat, natVal, type (*))
 import Data.Proxy (Proxy (..))
 import Numeric.LinearAlgebra.Static
   (C, M, konst, extract, Sized(fromList, unwrap, create), Domain(app, mul))
 import qualified Numeric.LinearAlgebra as LA
-import qualified Numeric.LinearAlgebra as LA
 import Numeric.LinearAlgebra.Static.COrphans ()  -- Eq (C n)
-import Symmetry.Group (Group (..), Irreps, IrrepDim, SectorDim)
+import Representations.Group (Group (..), IrrepDim, SectorDim, Irreps)
 
 -- | Parameter count for a flat @CoeffBlock@ (multiplicity coefficient layer).
 type family HomBlockDim (m :: Nat) (n :: Nat) :: Nat where
   HomBlockDim m n = m * n
-
-type family EndoHomDim (m :: Nat) :: Nat where
-  EndoHomDim m = HomBlockDim m m
 
 -- | Multiplicity coefficient matrix shared by all groups' Hom blocks
 -- (Schur: @Hom(V_j^{⊕n}, V_j^{⊕m}) ≅ M_{m,n}(C)@).
@@ -51,16 +44,9 @@ newtype CoeffBlock (m :: Nat) (n :: Nat) = CoeffBlock
 instance (KnownNat m, KnownNat n, KnownNat (m * n)) => Show (CoeffBlock m n) where
   show (CoeffBlock v) = show v
 
-instance Eq (M m n) where
-  a == b = undefined --  LA.flatten a == LA.flatten b
-
-instance (KnownNat m, KnownNat n, KnownNat (m * n)) => Eq (CoeffBlock m n) where
-  CoeffBlock a == CoeffBlock b = a == b
-
-flattenMat
-  :: forall m p d. (KnownNat m, KnownNat p, KnownNat d, HomBlockDim m p ~ d)
-  => M m p -> C d
-flattenMat mat = fromList $ LA.toList $ LA.flatten $ unwrap mat
+instance (KnownNat m, KnownNat n) => Eq (CoeffBlock m n) where
+  CoeffBlock a == CoeffBlock b =
+    LA.flatten (unwrap a) == LA.flatten (unwrap b)
 
 coeffBlockAsMat
   :: forall m n d. (KnownNat m, KnownNat n, KnownNat d, HomBlockDim m n ~ d)
@@ -108,14 +94,21 @@ applyBlock
   => CoeffBlock m n -> C n -> C m
 applyBlock blk = app (coeffBlockAsMat blk)
 
-applyEndoAt
-  :: forall m h. (KnownNat m, KnownNat h, EndoHomDim m ~ h)
-  => M m m -> C m -> C m
-applyEndoAt block v = applyBlock (CoeffBlock block) v
+eyeBlock
+  :: forall m. (KnownNat m, KnownNat (HomBlockDim m m))
+  => CoeffBlock m m
+eyeBlock =
+  let n = fromIntegral (natVal (Proxy @m)) :: Int
+   in CoeffBlock $
+        fromList
+          [ if i == j then 1 else 0
+          | i <- [0 .. n - 1]
+          , j <- [0 .. n - 1]
+          ]
 
 su2ExpandBlock
   :: forall spin m n.
-     (KnownNat spin, KnownNat m, KnownNat n, KnownNat (IrrepDim SU2 spin))
+     (KnownNat m, KnownNat n, KnownNat (IrrepDim SU2 spin))
   => CoeffBlock m n -> M (SectorDim SU2 spin m) (SectorDim SU2 spin n)
 su2ExpandBlock blk =
   fromList $
@@ -125,81 +118,22 @@ su2ExpandBlock blk =
           (unwrap (coeffBlockAsMat blk))
           (LA.ident (fromIntegral (natVal (Proxy @(IrrepDim SU2 spin)))))
 
---------------------------------------------------------------------------------
--- Group-indexed hom blocks
---------------------------------------------------------------------------------
-
-class HasHomBlock (g :: Group) where
-  type HomBlockDimG g (j :: Irreps g) (m :: Nat) (n :: Nat) :: Nat
-  data HomBlock g (j :: Irreps g) (m :: Nat) (n :: Nat)
-
-  zeroBlock
-    :: (KnownNat m, KnownNat n, KnownNat (HomBlockDimG g j m n))
-    => HomBlock g j m n
-
-  wrapCoeffs
-    :: (KnownNat m, KnownNat n, KnownNat (HomBlockDimG g j m n))
-    => CoeffBlock m n -> HomBlock g j m n
-
-  composeBlock
-    :: forall j m n p.
-       ( KnownNat m, KnownNat n, KnownNat p
-       , KnownNat (HomBlockDimG g j m n)
-       , KnownNat (HomBlockDimG g j n p)
-       , KnownNat (HomBlockDimG g j m p)
-       )
-    => HomBlock g j m n -> HomBlock g j n p -> HomBlock g j m p
-
-  blockAsMat
-    :: forall j m n sm sn.
+-- | Expand a Schur coefficient block to the sector map
+-- (@M_{m,n}@ for U(1); @kron(coeff, I_{j+1})@ for SU(2)).
+class ExpandBlock (g :: Group) where
+  expandBlock
+    :: forall (j :: Irreps g) m n.
        ( KnownNat m, KnownNat n
-       , KnownNat sm, KnownNat sn
-       , sm ~ SectorDim g j m, sn ~ SectorDim g j n
-       , KnownNat (HomBlockDimG g j m n)
+       , KnownNat (SectorDim g j m)
+       , KnownNat (SectorDim g j n)
        , KnownNat (IrrepDim g j)
        )
-    => HomBlock g j m n -> M sm sn
+    => Proxy j
+    -> CoeffBlock m n
+    -> M (SectorDim g j m) (SectorDim g j n)
 
-instance HasHomBlock U1 where
-  type HomBlockDimG U1 j m n = m * n
-  newtype HomBlock U1 (j :: Irreps U1) (m :: Nat) (n :: Nat)
-    = U1HB (CoeffBlock m n)
+instance ExpandBlock U1 where
+  expandBlock _ = coeffBlockAsMat
 
-  zeroBlock = U1HB zeroCoeffBlock
-  wrapCoeffs = U1HB
-  composeBlock (U1HB ab) (U1HB bc) = U1HB (composeCoeffBlock ab bc)
-  blockAsMat (U1HB blk) = coeffBlockAsMat blk
-
-deriving instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDimG U1 j m n)
-  ) => Show (HomBlock U1 j m n)
-
-deriving instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDimG U1 j m n)
-  ) => Eq (HomBlock U1 j m n)
-
-instance HasHomBlock SU2 where
-  type HomBlockDimG SU2 j m n = m * n
-  newtype HomBlock SU2 (j :: Nat) (m :: Nat) (n :: Nat)
-    = SU2HB (CoeffBlock m n)
-
-  zeroBlock = SU2HB zeroCoeffBlock
-  wrapCoeffs = SU2HB
-  composeBlock (SU2HB ab) (SU2HB bc) = SU2HB (composeCoeffBlock ab bc)
-  blockAsMat (blk :: HomBlock SU2 j m n) =
-    case blk of
-      SU2HB b ->
-        fromList $
-          LA.toList $
-            LA.flatten $
-              LA.kronecker
-                (unwrap (coeffBlockAsMat b))
-                (LA.ident (fromIntegral (natVal (Proxy @(IrrepDim SU2 j)))))
-
-deriving instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDimG SU2 j m n)
-  ) => Show (HomBlock SU2 j m n)
-
-deriving instance
-  ( KnownNat m, KnownNat n, KnownNat (HomBlockDimG SU2 j m n)
-  ) => Eq (HomBlock SU2 j m n)
+instance ExpandBlock SU2 where
+  expandBlock (_ :: Proxy j) = su2ExpandBlock @j

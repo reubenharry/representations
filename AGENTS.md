@@ -1,4 +1,4 @@
-# Agent notes — symmetry
+# Agent notes — representations
 
 Standalone library extracted from `quantum`. Same hard bans as that repo:
 
@@ -9,7 +9,8 @@ Standalone library extracted from `quantum`. Same hard bans as that repo:
 Verify with:
 
 ```bash
-cabal build symmetry:lib:symmetry
+cabal build representations:lib:representations
 ```
 
 Depends on a sibling checkout of `linearmap-family` (see `cabal.project`).
+Schur intertwiners live in `Representations.Intertwiner`; the forgetful category is `Representations.Mor`.

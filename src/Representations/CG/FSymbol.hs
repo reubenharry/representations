@@ -13,7 +13,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
--- | F-symbols as @IntertwinerG@ between coalesced @Tensor@ parenthesizations.
+-- | F-symbols as @Intertwiner@ between coalesced @Tensor@ parenthesizations.
 --
 -- * __U(1):__ coalesce+sort makes both spines match; F is @eye@ on each
 --   multiplicity block.
@@ -21,9 +21,8 @@
 --   second-factor-fastest flats make Vec @Assoc@ the identity, so this is the
 --   fused associator matching 'fuseSU2Flat'. (Racah \/ 6j equivalent; closed
 --   form can replace the dense step later without changing the API.)
-module Symmetry.CG.FSymbol
-  ( BuildEyeHomG (..)
-  , PackSchur (..)
+module Representations.CG.FSymbol
+  ( PackSchur (..)
   , fSymbolHomU1
   , fSymbolHomU1Inv
   , fSymbolHomSU2
@@ -39,68 +38,37 @@ import GHC.TypeLits (KnownNat, Nat, natVal)
 import qualified Numeric.LinearAlgebra as HM
 import Numeric.LinearAlgebra.Static
   ( M, Sized (fromList) )
-import Symmetry.CG.SU2 (fuseSU2Flat, repDimOf, sectorsSU2)
-import Symmetry.FunctorExperiment (IntertwinerG (..), IntertwinerSectorsG (..))
-import Symmetry.Group
-  ( Group (..), IntertwinerHom, Irreps )
-import Symmetry.HomBlock (HomBlockDim, CoeffBlock (..))
-import Symmetry.RepSingleton (KnownRep (..), SRep)
-import Symmetry.Tensor (Tensor)
+import Representations.CG.SU2 (fuseSU2Flat, repDimOf, sectorsSU2)
+import Representations.Intertwiner (Intertwiner (..), IntertwinerSectors (..), BuildIdHom (..))
+import Representations.Group
+  ( Group (..), IntertwinerHom )
+import Representations.Rep.HomBlock (HomBlockDim, CoeffBlock (..))
+import Representations.Rep.Singleton (KnownRep (..), SRep)
+import Representations.Rep.Tensor (Tensor)
 
 type ℂ = Complex Double
 
 --------------------------------------------------------------------------------
--- Eye Schur spines
+-- U(1) F is identity on coalesced spines
 --------------------------------------------------------------------------------
-
-eyeBlock
-  :: forall m. (KnownNat m, KnownNat (HomBlockDim m m))
-  => CoeffBlock m m
-eyeBlock =
-  let n = fromIntegral (natVal (Proxy @m)) :: Int
-   in CoeffBlock $
-        fromList
-          [ if i == j then 1 else 0
-          | i <- [0 .. n - 1]
-          , j <- [0 .. n - 1]
-          ]
-
-class BuildEyeHomG (g :: Group) (hom :: [(Irreps g, Nat, Nat)]) where
-  eyeHom :: IntertwinerSectorsG g hom
-
-instance BuildEyeHomG U1 '[] where
-  eyeHom = InterNil
-
-instance
-  ( KnownNat m, KnownNat (HomBlockDim m m), BuildEyeHomG U1 rest
-  ) => BuildEyeHomG U1 ('(z, m, m) ': rest) where
-  eyeHom = InterCons (eyeBlock @m) eyeHom
-
-instance BuildEyeHomG SU2 '[] where
-  eyeHom = InterNil
-
-instance
-  ( KnownNat m, KnownNat j, KnownNat (HomBlockDim m m), BuildEyeHomG SU2 rest
-  ) => BuildEyeHomG SU2 ('(j, m, m) ': rest) where
-  eyeHom = InterCons (eyeBlock @m) eyeHom
 
 fSymbolHomU1
   :: forall r q s.
      ( KnownRep U1 r, KnownRep U1 q, KnownRep U1 s
      , KnownRep U1 (Tensor U1 (Tensor U1 r q) s)
      , KnownRep U1 (Tensor U1 r (Tensor U1 q s))
-     , BuildEyeHomG U1
+     , BuildIdHom U1
          (IntertwinerHom U1
             (Tensor U1 (Tensor U1 r q) s)
             (Tensor U1 r (Tensor U1 q s)))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> IntertwinerG U1
+  -> Intertwiner U1
        (Tensor U1 (Tensor U1 r q) s)
        (Tensor U1 r (Tensor U1 q s))
 fSymbolHomU1 _ _ _ =
   MkIntertwiner
-    (eyeHom @U1
+    (idHom @U1
       @(IntertwinerHom U1
           (Tensor U1 (Tensor U1 r q) s)
           (Tensor U1 r (Tensor U1 q s))))
@@ -110,18 +78,18 @@ fSymbolHomU1Inv
      ( KnownRep U1 r, KnownRep U1 q, KnownRep U1 s
      , KnownRep U1 (Tensor U1 (Tensor U1 r q) s)
      , KnownRep U1 (Tensor U1 r (Tensor U1 q s))
-     , BuildEyeHomG U1
+     , BuildIdHom U1
          (IntertwinerHom U1
             (Tensor U1 r (Tensor U1 q s))
             (Tensor U1 (Tensor U1 r q) s))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> IntertwinerG U1
+  -> Intertwiner U1
        (Tensor U1 r (Tensor U1 q s))
        (Tensor U1 (Tensor U1 r q) s)
 fSymbolHomU1Inv _ _ _ =
   MkIntertwiner
-    (eyeHom @U1
+    (idHom @U1
       @(IntertwinerHom U1
           (Tensor U1 r (Tensor U1 q s))
           (Tensor U1 (Tensor U1 r q) s)))
@@ -224,7 +192,7 @@ class PackSchur (hom :: [(Nat, Nat, Nat)]) where
     :: [(Int, Int, Int)]  -- domain sectors
     -> [(Int, Int, Int)]  -- codomain sectors
     -> HM.Matrix ℂ        -- rows = codomain, cols = domain
-    -> IntertwinerSectorsG SU2 hom
+    -> IntertwinerSectors SU2 hom
 
 instance PackSchur '[] where
   packSchur _ _ _ = InterNil
@@ -276,7 +244,7 @@ fSymbolHomSU2
             (Tensor SU2 r (Tensor SU2 q s)))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> IntertwinerG SU2
+  -> Intertwiner SU2
        (Tensor SU2 (Tensor SU2 r q) s)
        (Tensor SU2 r (Tensor SU2 q s))
 fSymbolHomSU2 _ _ _ =
@@ -311,7 +279,7 @@ fSymbolHomSU2Inv
             (Tensor SU2 (Tensor SU2 r q) s))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> IntertwinerG SU2
+  -> Intertwiner SU2
        (Tensor SU2 r (Tensor SU2 q s))
        (Tensor SU2 (Tensor SU2 r q) s)
 fSymbolHomSU2Inv _ _ _ =

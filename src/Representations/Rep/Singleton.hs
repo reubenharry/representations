@@ -17,15 +17,15 @@
 -- tuples); this bespoke spine carries exactly what the recursions need — the
 -- irrep singleton and a @KnownNat@ multiplicity witness per sector — and
 -- nothing else.
-module Symmetry.RepSingleton
+module Representations.Rep.Singleton
   ( SRep(..)
   , KnownRep(..)
   ) where
 
 import GHC.TypeLits (KnownNat)
 import Data.Singletons (Sing, SingI, sing)
-import Symmetry.Group (Group (..), Rep)
-import Symmetry.ChargeEq ()  -- SingI instances for the U(1) charge kind Z
+import Representations.Group (Group (..), Rep)
+import Representations.Group.ChargeEq ()  -- SingI instances for the U(1) charge kind Z
 
 -- | The singleton for a rep spine: one 'Sing' irrep label and a 'KnownNat'
 -- multiplicity per sector. Constructors are indexed by @g@ so @'Rep g'@ reduces

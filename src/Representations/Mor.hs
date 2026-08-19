@@ -28,7 +28,7 @@
 -- to maps on @ToVector@. Unfused @Assoc@\/@Swap@\/unitors are cheap Vec
 -- coercions; @Fuse@ is CG. @FMove@ is the fused monoidal associator between
 -- @'REP (Tensor (Tensor r q) s)@ and @'REP (Tensor r (Tensor q s))@ — defined
--- via F-symbols \/ 6j as an @IntertwinerG@, __not__ by conjugating @Fuse@ with
+-- via F-symbols \/ 6j as an @Intertwiner@, __not__ by conjugating @Fuse@ with
 -- Vec @Assoc@. @RMove@ is the fused braiding
 -- @'REP (Tensor r q) → 'REP (Tensor q r)@ (@Fuse ∘ Swap ∘ Fuse†@), not Vec
 -- @Swap@ alone.
@@ -36,21 +36,24 @@
 -- Forgetting @Fuse@ is group-specific ('ForgetFuse'): U(1) Kronecker flatten;
 -- SU(2) Clebsch–Gordan. Associators → @lassocTensor@\/@rassocTensor@; braiding
 -- → @transposeTensor@; unitors → flat-tensor + @C 1@ scalarization; @OTimes@ →
--- @tensorOfMaps@; @FMove@\/@RMove@ carry @IntertwinerG@ from
--- 'Symmetry.CG.FSymbol' \/ 'Symmetry.CG.RSymbol'.
-module Symmetry.RepMor
+-- @tensorOfMaps@; @FMove@\/@RMove@ carry @Intertwiner@ from
+-- 'Representations.CG.FSymbol' \/ 'Representations.CG.RSymbol'.
+module Representations.Mor
   ( Mor (..)
   , GObj (..)
   , ForgetFuse (..)
   , fmap'
   , fmapSectors
-  , ForgetRepEndo (..)
   , fMoveU1, fMoveU1Inv
   , fMoveSU2, fMoveSU2Inv
   , rMoveU1, rMoveU1Inv
   , rMoveSU2, rMoveSU2Inv
-  , U1Mor
-  , SU2Mor
+  , type (-&>)
+  , CanFuse
+  , CanFMove
+  , CanRMove
+  , GTensor
+  , GLinear
   ) where
 
 import Prelude hiding ((.), id, Functor (..), ($))
@@ -65,62 +68,87 @@ import Math.LinearMap.Category
   , transposeTensor, toFlatTensor, fromFlatTensor, fmapTensor
   , applyDualVector, (-+$>)
   )
-import Math.LinearMap.Asserted (getLinearFunction, linearFunction, type (-+>))
+import Math.LinearMap.Asserted (linearFunction, type (-+>))
 import Math.LinearMap.Category.Instances ()
 import Math.LinearMap.Category.Backend.HMatrix ()
 import Math.LinearMap.Coercion (lassocTensor, rassocTensor, (-+$=>))
 import Math.VectorSpace.DimensionAware (toArray, unsafeFromArray)
 import Numeric.LinearAlgebra.Static (C, konst)
 import Numeric.LinearAlgebra.Static.COrphans ()
-import Symmetry.Categorical ((⊗^))
-import Symmetry.CG.FSymbol
-  ( BuildEyeHomG
-  , PackSchur
+import Representations.CG.FSymbol
+  ( PackSchur
   , fSymbolHomU1, fSymbolHomU1Inv
   , fSymbolHomSU2, fSymbolHomSU2Inv
   )
-import Symmetry.CG.RSymbol
+import Representations.CG.RSymbol
   ( rSymbolHomU1, rSymbolHomU1Inv
   , rSymbolHomSU2, rSymbolHomSU2Inv
   )
-import Symmetry.CG.SU2 (fuseSU2Flat)
-import Symmetry.CG.U1 (fuseU1Flat)
-import Symmetry.FunctorExperiment
-  ( IntertwinerG (..)
-  , composeG, intertwinerLinearG
-  , RepListG, ToCG (..), RepLookup
-  , BuildIdHomG, unRepVec
-  , BCIndexGo, ComposeGo, CollectCompiledGo
-  , ApplyIntertwinerG
+import Representations.CG.SU2 (fuseSU2Flat)
+import Representations.CG.U1 (fuseU1Flat)
+import Representations.Intertwiner
+  ( Intertwiner (..)
+  , compose, intertwinerLinear
+  , HasIntertwiner, KnownSpine
+  , BuildIdHom
   )
-import Symmetry.HomBlock (HasHomBlock)
-import Symmetry.Group (Group (..), RepDimG, IntertwinerHom)
-import Symmetry.RepObj (RepObj (..), ToSectors, ToVector)
-import Symmetry.RepSectors (ApplyEndoSectors, intertwinerEndoSectors)
-import Symmetry.RepSingleton (KnownRep (..))
-import Symmetry.Tensor (Tensor)
+import Representations.Group (Group (..), RepDim, IntertwinerHom)
+import Representations.Rep.Obj (RepObj (..), ToSectors, ToVector)
+import Representations.Rep.Sectors (ApplyEndoSectors, intertwinerEndoSectors, (⊗^))
+import Representations.Rep.Singleton (KnownRep (..))
+import Representations.Rep.Tensor (Tensor)
 
 type ℂ = Complex Double
+
+-- | Reduced-spine fusion: @RepDim (r ⊗ q) ~ RepDim r * RepDim q@.
+type CanFuse g r q =
+  ( KnownRep g r
+  , KnownRep g q
+  , KnownNat (RepDim g r)
+  , KnownNat (RepDim g q)
+  , KnownNat (RepDim g r * RepDim g q)
+  , KnownNat (RepDim g (Tensor g r q))
+  , RepDim g (Tensor g r q) ~ (RepDim g r * RepDim g q)
+  )
+
+-- | Fused associator @(r ⊗ q) ⊗ s ⇄ r ⊗ (q ⊗ s)@ on reduced spines.
+type CanFMove g r q s =
+  ( KnownRep g r
+  , KnownRep g q
+  , KnownRep g s
+  , HasIntertwiner g
+      (Tensor g (Tensor g r q) s)
+      (Tensor g r (Tensor g q s))
+  )
+
+-- | Fused braiding @r ⊗ q ⇄ q ⊗ r@ on reduced spines.
+type CanRMove g r q =
+  ( KnownRep g r
+  , KnownRep g q
+  , HasIntertwiner g (Tensor g r q) (Tensor g q r)
+  )
+
+-- | @ToVector g a@ is a complex tensor space (unfused associators).
+type GTensor g a =
+  ( TensorSpace (ToVector g a)
+  , Scalar (ToVector g a) ~ ℂ
+  )
+
+-- | @ToVector g a@ is a complex linear space (braiding, unitors).
+type GLinear g a =
+  ( LinearSpace (ToVector g a)
+  , Scalar (ToVector g a) ~ ℂ
+  )
 
 -- | Morphisms in the forgetful rep category for group @g@.
 data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
   RepInter
-    :: ( KnownNat (RepDimG g r), KnownNat (RepDimG g q)
-       , RepListG g r, RepListG g q
-       , KnownRep g r, KnownRep g q
-       , RepLookup g, HasHomBlock g, BCIndexGo g, ComposeGo g
-       , CollectCompiledGo g, ApplyIntertwinerG g r q
-       )
-    => IntertwinerG g r q
+    :: HasIntertwiner g r q
+    => Intertwiner g r q
     -> Mor g ('REP r) ('REP q)
   -- | Fuse two reduced spines (leaf tensor only).
   Fuse
-    :: ( KnownNat (RepDimG g r), KnownNat (RepDimG g q)
-       , KnownNat (RepDimG g r * RepDimG g q)
-       , KnownNat (RepDimG g (Tensor g r q))
-       , RepDimG g (Tensor g r q) ~ (RepDimG g r * RepDimG g q)
-       , KnownRep g r, KnownRep g q
-       )
+    :: CanFuse g r q
     => Mor g ('REP r ':⊗: 'REP q) ('REP (Tensor g r q))
   -- | Fused associator (F-move):
   -- @α : (r ⊗ q) ⊗ s → r ⊗ (q ⊗ s)@ on reduced spines.
@@ -128,20 +156,8 @@ data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
   -- Proxies are required because @Tensor@ is non-injective.
   -- Build with 'fMoveSU2' \/ 'fMoveU1' (packs F-symbols into the intertwiner).
   FMove
-    :: ( KnownNat (RepDimG g (Tensor g (Tensor g r q) s))
-       , KnownNat (RepDimG g (Tensor g r (Tensor g q s)))
-       , RepListG g (Tensor g (Tensor g r q) s)
-       , RepListG g (Tensor g r (Tensor g q s))
-       , KnownRep g r, KnownRep g q, KnownRep g s
-       , KnownRep g (Tensor g (Tensor g r q) s)
-       , KnownRep g (Tensor g r (Tensor g q s))
-       , RepLookup g, HasHomBlock g, BCIndexGo g, ComposeGo g
-       , CollectCompiledGo g
-       , ApplyIntertwinerG g
-           (Tensor g (Tensor g r q) s)
-           (Tensor g r (Tensor g q s))
-       )
-    => IntertwinerG g
+    :: CanFMove g r q s
+    => Intertwiner g
          (Tensor g (Tensor g r q) s)
          (Tensor g r (Tensor g q s))
     -> Proxy r
@@ -152,20 +168,8 @@ data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
          ('REP (Tensor g r (Tensor g q s)))
   -- | Inverse F-move: @α⁻¹ : r ⊗ (q ⊗ s) → (r ⊗ q) ⊗ s@.
   FMoveInv
-    :: ( KnownNat (RepDimG g (Tensor g (Tensor g r q) s))
-       , KnownNat (RepDimG g (Tensor g r (Tensor g q s)))
-       , RepListG g (Tensor g (Tensor g r q) s)
-       , RepListG g (Tensor g r (Tensor g q s))
-       , KnownRep g r, KnownRep g q, KnownRep g s
-       , KnownRep g (Tensor g (Tensor g r q) s)
-       , KnownRep g (Tensor g r (Tensor g q s))
-       , RepLookup g, HasHomBlock g, BCIndexGo g, ComposeGo g
-       , CollectCompiledGo g
-       , ApplyIntertwinerG g
-           (Tensor g r (Tensor g q s))
-           (Tensor g (Tensor g r q) s)
-       )
-    => IntertwinerG g
+    :: CanFMove g r q s
+    => Intertwiner g
          (Tensor g r (Tensor g q s))
          (Tensor g (Tensor g r q) s)
     -> Proxy r
@@ -177,81 +181,45 @@ data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
   -- | Fused braiding (R-move): @σ : r ⊗ q → q ⊗ r@ on reduced spines.
   -- Build with 'rMoveSU2' \/ 'rMoveU1'.
   RMove
-    :: ( KnownNat (RepDimG g (Tensor g r q))
-       , KnownNat (RepDimG g (Tensor g q r))
-       , RepListG g (Tensor g r q)
-       , RepListG g (Tensor g q r)
-       , KnownRep g r, KnownRep g q
-       , KnownRep g (Tensor g r q)
-       , KnownRep g (Tensor g q r)
-       , RepLookup g, HasHomBlock g, BCIndexGo g, ComposeGo g
-       , CollectCompiledGo g
-       , ApplyIntertwinerG g (Tensor g r q) (Tensor g q r)
-       )
-    => IntertwinerG g (Tensor g r q) (Tensor g q r)
+    :: CanRMove g r q
+    => Intertwiner g (Tensor g r q) (Tensor g q r)
     -> Proxy r
     -> Proxy q
     -> Mor g ('REP (Tensor g r q)) ('REP (Tensor g q r))
   -- | Inverse R-move: @σ⁻¹ : q ⊗ r → r ⊗ q@.
   RMoveInv
-    :: ( KnownNat (RepDimG g (Tensor g r q))
-       , KnownNat (RepDimG g (Tensor g q r))
-       , RepListG g (Tensor g r q)
-       , RepListG g (Tensor g q r)
-       , KnownRep g r, KnownRep g q
-       , KnownRep g (Tensor g r q)
-       , KnownRep g (Tensor g q r)
-       , RepLookup g, HasHomBlock g, BCIndexGo g, ComposeGo g
-       , CollectCompiledGo g
-       , ApplyIntertwinerG g (Tensor g q r) (Tensor g r q)
-       )
-    => IntertwinerG g (Tensor g q r) (Tensor g r q)
+    :: CanRMove g r q
+    => Intertwiner g (Tensor g q r) (Tensor g r q)
     -> Proxy r
     -> Proxy q
     -> Mor g ('REP (Tensor g q r)) ('REP (Tensor g r q))
   -- | Associator @α : a ⊗ (b ⊗ c) → (a ⊗ b) ⊗ c@ (unfused Vec associator).
   Assoc
-    :: ( TensorSpace (ToVector g a)
-       , TensorSpace (ToVector g b)
-       , TensorSpace (ToVector g c)
-       , Scalar (ToVector g a) ~ ℂ
-       , Scalar (ToVector g b) ~ ℂ
-       , Scalar (ToVector g c) ~ ℂ
-       )
+    :: (GTensor g a, GTensor g b, GTensor g c)
     => Mor g (a ':⊗: (b ':⊗: c)) ((a ':⊗: b) ':⊗: c)
   -- | Inverse associator @α⁻¹ : (a ⊗ b) ⊗ c → a ⊗ (b ⊗ c)@.
   AssocInv
-    :: ( TensorSpace (ToVector g a)
-       , TensorSpace (ToVector g b)
-       , TensorSpace (ToVector g c)
-       , Scalar (ToVector g a) ~ ℂ
-       , Scalar (ToVector g b) ~ ℂ
-       , Scalar (ToVector g c) ~ ℂ
-       )
+    :: (GTensor g a, GTensor g b, GTensor g c)
     => Mor g ((a ':⊗: b) ':⊗: c) (a ':⊗: (b ':⊗: c))
   -- | Braiding @σ : a ⊗ b → b ⊗ a@.
   Swap
-    :: ( LinearSpace (ToVector g a)
-       , LinearSpace (ToVector g b)
-       , Scalar (ToVector g a) ~ ℂ
-       , Scalar (ToVector g b) ~ ℂ
-       )
+    :: (GLinear g a, GLinear g b)
     => Mor g (a ':⊗: b) (b ':⊗: a)
   -- | Left unitor @λ : I ⊗ a → a@.
   LUnit
-    :: ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+    :: GLinear g a
     => Mor g ('I ':⊗: a) a
   -- | Inverse left unitor @λ⁻¹ : a → I ⊗ a@.
   LUnitInv
-    :: ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+    :: GLinear g a
     => Mor g a ('I ':⊗: a)
   -- | Right unitor @ρ : a ⊗ I → a@.
   RUnit
-    :: ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+    :: GLinear g a
     => Mor g (a ':⊗: 'I) a
   -- | Inverse right unitor @ρ⁻¹ : a → a ⊗ I@.
   RUnitInv
-    :: ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+    :: GLinear g a
     => Mor g a (a ':⊗: 'I)
   -- | Monoidal product of morphisms @f ⊗ g : a⊗c → b⊗d@.
   -- Stays symbolic until @fmap'@ (then @tensorOfMaps@).
@@ -259,8 +227,6 @@ data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
     :: ( GObj g a, GObj g b, GObj g c, GObj g d
        , LSpace (ToVector g a), LSpace (ToVector g b)
        , LSpace (ToVector g c), LSpace (ToVector g d)
-       , Scalar (ToVector g a) ~ ℂ, Scalar (ToVector g b) ~ ℂ
-       , Scalar (ToVector g c) ~ ℂ, Scalar (ToVector g d) ~ ℂ
        )
     => Mor g a b
     -> Mor g c d
@@ -268,21 +234,22 @@ data Mor (g :: Group) (a :: RepObj g) (b :: RepObj g) where
   MorId :: Mor g a a
   Comp  :: GObj g b => Mor g b c -> Mor g a b -> Mor g a c
 
-type U1Mor = Mor U1
-type SU2Mor = Mor SU2
+-- | Infix for @Mor g@. @g@ is recovered from the objects because 'Rep' (and
+-- 'Irreps') are injective: @[(Z, Nat)]@ is U(1), @[(Nat, Nat)]@ is SU(2).
+-- Ambiguous only when both sides are group-polymorphic, e.g. @'I -&> 'I@.
+infixr 1 -&>
+type (a :: RepObj g) -&> (b :: RepObj g) = Mor g a b
 
 -- | Category objects: recoverable @forgetId@ on @ToVector g a@.
-class ( TensorSpace (ToVector g a)
-      , Scalar (ToVector g a) ~ ℂ
-      ) => GObj (g :: Group) (a :: RepObj g) where
+class GTensor g a => GObj (g :: Group) (a :: RepObj g) where
   forgetId :: ToVector g a -+> ToVector g a
 
 instance GObj g 'I where
   forgetId = id
 
 instance
-  ( RepListG g r, KnownNat (RepDimG g r)
-  , BuildIdHomG g (IntertwinerHom g r r), KnownRep g r
+  ( KnownSpine g r
+  , BuildIdHom g (IntertwinerHom g r r)
   ) => GObj g ('REP r) where
   forgetId = id
 
@@ -292,13 +259,7 @@ instance (GObj g a, GObj g b) => GObj g (a ':⊗: b) where
 -- | Group-specific forgetful image of leaf @Fuse@.
 class ForgetFuse (g :: Group) where
   forgetFuse
-    :: forall r q.
-       ( KnownNat (RepDimG g r), KnownNat (RepDimG g q)
-       , KnownNat (RepDimG g r * RepDimG g q)
-       , KnownNat (RepDimG g (Tensor g r q))
-       , RepDimG g (Tensor g r q) ~ (RepDimG g r * RepDimG g q)
-       , KnownRep g r, KnownRep g q
-       )
+    :: forall r q. CanFuse g r q
     => Proxy r
     -> Proxy q
     -> ToVector g ('REP r ':⊗: 'REP q) -+> ToVector g ('REP (Tensor g r q))
@@ -316,169 +277,101 @@ instance ForgetFuse SU2 where
 -- | U(1) F-move: identity on coalesced @Tensor@ spines.
 fMoveU1
   :: forall r q s.
-     ( KnownNat (RepDimG U1 (Tensor U1 (Tensor U1 r q) s))
-     , KnownNat (RepDimG U1 (Tensor U1 r (Tensor U1 q s)))
-     , RepListG U1 (Tensor U1 (Tensor U1 r q) s)
-     , RepListG U1 (Tensor U1 r (Tensor U1 q s))
-     , KnownRep U1 r, KnownRep U1 q, KnownRep U1 s
-     , KnownRep U1 (Tensor U1 (Tensor U1 r q) s)
-     , KnownRep U1 (Tensor U1 r (Tensor U1 q s))
-     , ApplyIntertwinerG U1
-         (Tensor U1 (Tensor U1 r q) s)
-         (Tensor U1 r (Tensor U1 q s))
-     , BuildEyeHomG U1
+     ( CanFMove U1 r q s
+     , BuildIdHom U1
          (IntertwinerHom U1
             (Tensor U1 (Tensor U1 r q) s)
             (Tensor U1 r (Tensor U1 q s)))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> U1Mor
-       ('REP (Tensor U1 (Tensor U1 r q) s))
-       ('REP (Tensor U1 r (Tensor U1 q s)))
+  -> 'REP (Tensor U1 (Tensor U1 r q) s)
+     -&> 'REP (Tensor U1 r (Tensor U1 q s))
 fMoveU1 pr pq ps = FMove (fSymbolHomU1 pr pq ps) pr pq ps
 
 fMoveU1Inv
   :: forall r q s.
-     ( KnownNat (RepDimG U1 (Tensor U1 (Tensor U1 r q) s))
-     , KnownNat (RepDimG U1 (Tensor U1 r (Tensor U1 q s)))
-     , RepListG U1 (Tensor U1 (Tensor U1 r q) s)
-     , RepListG U1 (Tensor U1 r (Tensor U1 q s))
-     , KnownRep U1 r, KnownRep U1 q, KnownRep U1 s
-     , KnownRep U1 (Tensor U1 (Tensor U1 r q) s)
-     , KnownRep U1 (Tensor U1 r (Tensor U1 q s))
-     , ApplyIntertwinerG U1
-         (Tensor U1 r (Tensor U1 q s))
-         (Tensor U1 (Tensor U1 r q) s)
-     , BuildEyeHomG U1
+     ( CanFMove U1 r q s
+     , BuildIdHom U1
          (IntertwinerHom U1
             (Tensor U1 r (Tensor U1 q s))
             (Tensor U1 (Tensor U1 r q) s))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> U1Mor
-       ('REP (Tensor U1 r (Tensor U1 q s)))
-       ('REP (Tensor U1 (Tensor U1 r q) s))
+  -> 'REP (Tensor U1 r (Tensor U1 q s))
+     -&> 'REP (Tensor U1 (Tensor U1 r q) s)
 fMoveU1Inv pr pq ps = FMoveInv (fSymbolHomU1Inv pr pq ps) pr pq ps
 
--- | SU(2) F-move from CG-coherent Schur blocks ('Symmetry.CG.FSymbol').
+-- | SU(2) F-move from CG-coherent Schur blocks ('Representations.CG.FSymbol').
 fMoveSU2
   :: forall r q s.
-     ( KnownNat (RepDimG SU2 (Tensor SU2 (Tensor SU2 r q) s))
-     , KnownNat (RepDimG SU2 (Tensor SU2 r (Tensor SU2 q s)))
-     , RepListG SU2 (Tensor SU2 (Tensor SU2 r q) s)
-     , RepListG SU2 (Tensor SU2 r (Tensor SU2 q s))
-     , KnownRep SU2 r, KnownRep SU2 q, KnownRep SU2 s
+     ( CanFMove SU2 r q s
      , KnownRep SU2 (Tensor SU2 r q)
      , KnownRep SU2 (Tensor SU2 q s)
-     , KnownRep SU2 (Tensor SU2 (Tensor SU2 r q) s)
-     , KnownRep SU2 (Tensor SU2 r (Tensor SU2 q s))
-     , ApplyIntertwinerG SU2
-         (Tensor SU2 (Tensor SU2 r q) s)
-         (Tensor SU2 r (Tensor SU2 q s))
      , PackSchur
          (IntertwinerHom SU2
             (Tensor SU2 (Tensor SU2 r q) s)
             (Tensor SU2 r (Tensor SU2 q s)))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> SU2Mor
-       ('REP (Tensor SU2 (Tensor SU2 r q) s))
-       ('REP (Tensor SU2 r (Tensor SU2 q s)))
+  -> 'REP (Tensor SU2 (Tensor SU2 r q) s)
+     -&> 'REP (Tensor SU2 r (Tensor SU2 q s))
 fMoveSU2 pr pq ps = FMove (fSymbolHomSU2 pr pq ps) pr pq ps
 
 fMoveSU2Inv
   :: forall r q s.
-     ( KnownNat (RepDimG SU2 (Tensor SU2 (Tensor SU2 r q) s))
-     , KnownNat (RepDimG SU2 (Tensor SU2 r (Tensor SU2 q s)))
-     , RepListG SU2 (Tensor SU2 (Tensor SU2 r q) s)
-     , RepListG SU2 (Tensor SU2 r (Tensor SU2 q s))
-     , KnownRep SU2 r, KnownRep SU2 q, KnownRep SU2 s
+     ( CanFMove SU2 r q s
      , KnownRep SU2 (Tensor SU2 r q)
      , KnownRep SU2 (Tensor SU2 q s)
-     , KnownRep SU2 (Tensor SU2 (Tensor SU2 r q) s)
-     , KnownRep SU2 (Tensor SU2 r (Tensor SU2 q s))
-     , ApplyIntertwinerG SU2
-         (Tensor SU2 r (Tensor SU2 q s))
-         (Tensor SU2 (Tensor SU2 r q) s)
      , PackSchur
          (IntertwinerHom SU2
             (Tensor SU2 r (Tensor SU2 q s))
             (Tensor SU2 (Tensor SU2 r q) s))
      )
   => Proxy r -> Proxy q -> Proxy s
-  -> SU2Mor
-       ('REP (Tensor SU2 r (Tensor SU2 q s)))
-       ('REP (Tensor SU2 (Tensor SU2 r q) s))
+  -> 'REP (Tensor SU2 r (Tensor SU2 q s))
+     -&> 'REP (Tensor SU2 (Tensor SU2 r q) s)
 fMoveSU2Inv pr pq ps = FMoveInv (fSymbolHomSU2Inv pr pq ps) pr pq ps
 
 -- | U(1) R-move: identity on coalesced @Tensor@ spines.
 rMoveU1
   :: forall r q.
-     ( KnownNat (RepDimG U1 (Tensor U1 r q))
-     , KnownNat (RepDimG U1 (Tensor U1 q r))
-     , RepListG U1 (Tensor U1 r q)
-     , RepListG U1 (Tensor U1 q r)
-     , KnownRep U1 r, KnownRep U1 q
-     , KnownRep U1 (Tensor U1 r q)
-     , KnownRep U1 (Tensor U1 q r)
-     , ApplyIntertwinerG U1 (Tensor U1 r q) (Tensor U1 q r)
-     , BuildEyeHomG U1
+     ( CanRMove U1 r q
+     , BuildIdHom U1
          (IntertwinerHom U1 (Tensor U1 r q) (Tensor U1 q r))
      )
   => Proxy r -> Proxy q
-  -> U1Mor ('REP (Tensor U1 r q)) ('REP (Tensor U1 q r))
+  -> 'REP (Tensor U1 r q) -&> 'REP (Tensor U1 q r)
 rMoveU1 pr pq = RMove (rSymbolHomU1 pr pq) pr pq
 
 rMoveU1Inv
   :: forall r q.
-     ( KnownNat (RepDimG U1 (Tensor U1 r q))
-     , KnownNat (RepDimG U1 (Tensor U1 q r))
-     , RepListG U1 (Tensor U1 r q)
-     , RepListG U1 (Tensor U1 q r)
-     , KnownRep U1 r, KnownRep U1 q
-     , KnownRep U1 (Tensor U1 r q)
-     , KnownRep U1 (Tensor U1 q r)
-     , ApplyIntertwinerG U1 (Tensor U1 q r) (Tensor U1 r q)
-     , BuildEyeHomG U1
+     ( CanRMove U1 r q
+     , BuildIdHom U1
          (IntertwinerHom U1 (Tensor U1 q r) (Tensor U1 r q))
      )
   => Proxy r -> Proxy q
-  -> U1Mor ('REP (Tensor U1 q r)) ('REP (Tensor U1 r q))
+  -> 'REP (Tensor U1 q r) -&> 'REP (Tensor U1 r q)
 rMoveU1Inv pr pq = RMoveInv (rSymbolHomU1Inv pr pq) pr pq
 
--- | SU(2) R-move from CG-coherent Schur blocks ('Symmetry.CG.RSymbol').
+-- | SU(2) R-move from CG-coherent Schur blocks ('Representations.CG.RSymbol').
 rMoveSU2
   :: forall r q.
-     ( KnownNat (RepDimG SU2 (Tensor SU2 r q))
-     , KnownNat (RepDimG SU2 (Tensor SU2 q r))
-     , RepListG SU2 (Tensor SU2 r q)
-     , RepListG SU2 (Tensor SU2 q r)
-     , KnownRep SU2 r, KnownRep SU2 q
-     , KnownRep SU2 (Tensor SU2 r q)
-     , KnownRep SU2 (Tensor SU2 q r)
-     , ApplyIntertwinerG SU2 (Tensor SU2 r q) (Tensor SU2 q r)
+     ( CanRMove SU2 r q
      , PackSchur
          (IntertwinerHom SU2 (Tensor SU2 r q) (Tensor SU2 q r))
      )
   => Proxy r -> Proxy q
-  -> SU2Mor ('REP (Tensor SU2 r q)) ('REP (Tensor SU2 q r))
+  -> 'REP (Tensor SU2 r q) -&> 'REP (Tensor SU2 q r)
 rMoveSU2 pr pq = RMove (rSymbolHomSU2 pr pq) pr pq
 
 rMoveSU2Inv
   :: forall r q.
-     ( KnownNat (RepDimG SU2 (Tensor SU2 r q))
-     , KnownNat (RepDimG SU2 (Tensor SU2 q r))
-     , RepListG SU2 (Tensor SU2 r q)
-     , RepListG SU2 (Tensor SU2 q r)
-     , KnownRep SU2 r, KnownRep SU2 q
-     , KnownRep SU2 (Tensor SU2 r q)
-     , KnownRep SU2 (Tensor SU2 q r)
-     , ApplyIntertwinerG SU2 (Tensor SU2 q r) (Tensor SU2 r q)
+     ( CanRMove SU2 r q
      , PackSchur
          (IntertwinerHom SU2 (Tensor SU2 q r) (Tensor SU2 r q))
      )
   => Proxy r -> Proxy q
-  -> SU2Mor ('REP (Tensor SU2 q r)) ('REP (Tensor SU2 r q))
+  -> 'REP (Tensor SU2 q r) -&> 'REP (Tensor SU2 r q)
 rMoveSU2Inv pr pq = RMoveInv (rSymbolHomSU2Inv pr pq) pr pq
 
 --------------------------------------------------------------------------------
@@ -532,12 +425,7 @@ forgetAssocInv _ =
   error "forgetAssocInv: expected bare AssocInv"
 
 forgetSwap
-  :: forall g a b.
-     ( LinearSpace (ToVector g a)
-     , LinearSpace (ToVector g b)
-     , Scalar (ToVector g a) ~ ℂ
-     , Scalar (ToVector g b) ~ ℂ
-     )
+  :: forall g a b. (GLinear g a, GLinear g b)
   => Mor g (a ':⊗: b) (b ':⊗: a)
   -> ToVector g (a ':⊗: b) -+> ToVector g (b ':⊗: a)
 forgetSwap Swap = transposeTensor @(ToVector g a) @(ToVector g b)
@@ -545,8 +433,7 @@ forgetSwap _ =
   error "forgetSwap: expected bare Swap"
 
 forgetRUnit
-  :: forall g a.
-     ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+  :: forall g a. GLinear g a
   => Mor g (a ':⊗: 'I) a
   -> ToVector g (a ':⊗: 'I) -+> ToVector g a
 forgetRUnit RUnit =
@@ -556,8 +443,7 @@ forgetRUnit _ =
   error "forgetRUnit: expected bare RUnit"
 
 forgetRUnitInv
-  :: forall g a.
-     ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+  :: forall g a. GLinear g a
   => Mor g a (a ':⊗: 'I)
   -> ToVector g a -+> ToVector g (a ':⊗: 'I)
 forgetRUnitInv RUnitInv =
@@ -567,8 +453,7 @@ forgetRUnitInv _ =
   error "forgetRUnitInv: expected bare RUnitInv"
 
 forgetLUnit
-  :: forall g a.
-     ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+  :: forall g a. GLinear g a
   => Mor g ('I ':⊗: a) a
   -> ToVector g ('I ':⊗: a) -+> ToVector g a
 forgetLUnit LUnit =
@@ -579,8 +464,7 @@ forgetLUnit _ =
   error "forgetLUnit: expected bare LUnit"
 
 forgetLUnitInv
-  :: forall g a.
-     ( LinearSpace (ToVector g a), Scalar (ToVector g a) ~ ℂ )
+  :: forall g a. GLinear g a
   => Mor g a ('I ':⊗: a)
   -> ToVector g a -+> ToVector g ('I ':⊗: a)
 forgetLUnitInv LUnitInv =
@@ -596,8 +480,6 @@ forgetOTimes
      , GObj g a, GObj g b, GObj g c, GObj g d
      , LSpace (ToVector g a), LSpace (ToVector g b)
      , LSpace (ToVector g c), LSpace (ToVector g d)
-     , Scalar (ToVector g a) ~ ℂ, Scalar (ToVector g b) ~ ℂ
-     , Scalar (ToVector g c) ~ ℂ, Scalar (ToVector g d) ~ ℂ
      )
   => Mor g (a ':⊗: c) (b ':⊗: d)
   -> ToVector g (a ':⊗: c) -+> ToVector g (b ':⊗: d)
@@ -614,17 +496,12 @@ fmap'
      )
   => Mor g a b
   -> ToVector g a -+> ToVector g b
-fmap' (RepInter mor) = linearFunction $ \v ->
-    unRepVec (getLinearFunction (intertwinerLinearG @g mor) (ToCG v))
+fmap' (RepInter mor) = intertwinerLinear @g mor
 fmap' m@Fuse = forgetFuseFrom m
-fmap' (FMove mor _ _ _) = linearFunction $ \v ->
-    unRepVec (getLinearFunction (intertwinerLinearG @g mor) (ToCG v))
-fmap' (FMoveInv mor _ _ _) = linearFunction $ \v ->
-    unRepVec (getLinearFunction (intertwinerLinearG @g mor) (ToCG v))
-fmap' (RMove mor _ _) = linearFunction $ \v ->
-    unRepVec (getLinearFunction (intertwinerLinearG @g mor) (ToCG v))
-fmap' (RMoveInv mor _ _) = linearFunction $ \v ->
-    unRepVec (getLinearFunction (intertwinerLinearG @g mor) (ToCG v))
+fmap' (FMove mor _ _ _) = intertwinerLinear @g mor
+fmap' (FMoveInv mor _ _ _) = intertwinerLinear @g mor
+fmap' (RMove mor _ _) = intertwinerLinear @g mor
+fmap' (RMoveInv mor _ _) = intertwinerLinear @g mor
 fmap' m@Assoc          = forgetAssoc m
 fmap' m@AssocInv       = forgetAssocInv m
 fmap' m@Swap           = forgetSwap m
@@ -636,41 +513,24 @@ fmap' m@OTimes{}       = forgetOTimes m
 fmap' MorId            = forgetId @g @a
 fmap' (Comp h f)       = fmap' h . fmap' f
 
--- | Structure-preserving forgetful functor on reduced-spine endomorphisms
--- (sibling of 'fmap''). Applies @coeff ⊗ id@ per sector.
+-- | Forget a reduced-spine endomorphism, applying @coeff ⊗ id@ per sector.
 -- General @r → q@ (and @Fuse@ / unfused structural maps) are unfinished.
-class ForgetRepEndo (g :: Group) where
-  forgetRepEndo
-    :: ( ApplyEndoSectors g r
-       , VectorSpace (ToSectors g ('REP r))
-       , Scalar (ToSectors g ('REP r)) ~ ℂ
-       )
-    => IntertwinerG g r r
-    -> ToSectors g ('REP r) -+> ToSectors g ('REP r)
-
-instance ForgetRepEndo U1 where
-  forgetRepEndo = intertwinerEndoSectors @U1
-
-instance ForgetRepEndo SU2 where
-  forgetRepEndo = intertwinerEndoSectors @SU2
-
 fmapSectors
   :: forall g r.
      ( ApplyEndoSectors g r
-     , ForgetRepEndo g
      , VectorSpace (ToSectors g ('REP r))
      , Scalar (ToSectors g ('REP r)) ~ ℂ
      )
   => Mor g ('REP r) ('REP r)
   -> ToSectors g ('REP r) -+> ToSectors g ('REP r)
-fmapSectors (RepInter mor) = forgetRepEndo mor
-fmapSectors (FMove mor _ _ _) = forgetRepEndo mor
-fmapSectors (FMoveInv mor _ _ _) = forgetRepEndo mor
-fmapSectors (RMove mor _ _) = forgetRepEndo mor
-fmapSectors (RMoveInv mor _ _) = forgetRepEndo mor
+fmapSectors (RepInter mor) = intertwinerEndoSectors @g mor
+fmapSectors (FMove mor _ _ _) = intertwinerEndoSectors @g mor
+fmapSectors (FMoveInv mor _ _ _) = intertwinerEndoSectors @g mor
+fmapSectors (RMove mor _ _) = intertwinerEndoSectors @g mor
+fmapSectors (RMoveInv mor _ _) = intertwinerEndoSectors @g mor
 fmapSectors MorId = linearFunction (\x -> x)
 fmapSectors (Comp _ _) =
-  undefined -- fmapSectors Comp: intermediate object may not be this spine
+  error "fmapSectors: composition is only defined on a single reduced spine"
 
 
 instance Category (Mor g) where
@@ -681,5 +541,5 @@ instance Category (Mor g) where
 
   MorId . f = f
   h . MorId = h
-  RepInter k . RepInter f = RepInter (composeG @g k f)
+  RepInter k . RepInter f = RepInter (compose @g k f)
   h . f = Comp h f
